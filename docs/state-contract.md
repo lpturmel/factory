@@ -56,6 +56,23 @@ The dashboard may read `name`, `backlog`, `merge`, `concurrency`,
 `max_rounds`, `reviewers[].name` and `models.aliases`. Full schema:
 [`templates/factory/config.json`](../templates/factory/config.json).
 
+`models.efforts` (optional) is a flat object beside `models.agents`: agent
+name → reasoning effort, one of `low`, `medium`, `high`, `xhigh`, `max`
+(case-sensitive). Keys must be known agents: `intake`, `spec-writer`,
+`builder`, `approver`, or a `reviewers[].name`. An agent with no entry runs at
+its default effort. It is read from the live config on every spawn, so a
+change applies to open jobs too. If the map is present but invalid (not an
+object, an unknown agent, a value outside the list), `job next`, `feedback`,
+`approve` and `merge` print `ERROR <message>` and change nothing.
+
+```json
+"models": {
+  "aliases": {"...": "..."},
+  "agents": {"builder": "opus"},
+  "efforts": {"code-reviewer": "low", "builder": "high"}
+}
+```
+
 ## 3. Job folder: `<path>/factory/jobs/<job-id>/`
 
 Gitignored, local to the machine running the factory. One folder per job.
@@ -98,6 +115,7 @@ Written **only** by `factory/bin/job`.
     {"name": "ux-reviewer", "model": "sonnet", "model_id": "claude-sonnet-5-5"},
     {"name": "ui-reviewer", "model": "haiku", "model_id": "claude-haiku-5-5"}
   ],
+  "efforts": {"builder": "high", "code-reviewer": "low"},
   "round": 2,
   "max_rounds": 4,
   "branch": "factory/gh-42",
@@ -153,6 +171,7 @@ Written **only** by `factory/bin/job`.
 | `surfaces` | string[] | Subset of `config.surfaces` keys, set by intake. `[]` until then. |
 | `models` | object | Alias per fixed role, copied from config at creation. |
 | `reviewers` | object[] | Routed reviewers (`factory/bin/route`), set on ACCEPT; `[]` before. `model` is an alias, `model_id` the resolved id. |
+| `efforts` | object (optional) | Agent → reasoning effort of that agent's most recent spawn (`low` … `max`), from `config.models.efforts` at spawn time. An agent with no key, or a job with no `efforts` field, was spawned at its default effort. Absent when no effort is in use; jobs created before this field existed lack it. |
 | `round` | int | Build round. `0` before the first build, then 1, 2, … Increments every time the job re-enters `build`. |
 | `max_rounds` | int | From config at creation. Exceeding it moves the job to `needs-human`. |
 | `branch` | string \| null | `factory/<job-id>`, set on ACCEPT. |
@@ -169,6 +188,21 @@ Written **only** by `factory/bin/job`.
 | `created_at`, `updated_at` | timestamp | |
 | `stage_entered_at` | timestamp | When the current `stage` was entered (time-in-stage = now − this). |
 | `history` | object[] | Every stage entry in order: `{stage, at, round, note}`. Per-stage durations are the gaps between consecutive entries. The first entry is always `intake`. |
+
+### SPAWN line
+
+`job next` (and `feedback`, `approve`) tells the orchestrator which agents to
+start with one line:
+
+```
+<id> <stage> SPAWN <agent>:<model>[:<effort>] [<agent>:<model>[:<effort>] ...] out=<file>[,<file>...]
+```
+
+The third field is present only for an agent with an entry in
+`config.models.efforts`, e.g. `gh-42 review SPAWN code-reviewer:sonnet:low
+ui-reviewer:haiku out=review-2-code-reviewer.md,review-2-ui-reviewer.md`. The
+orchestrator passes it as the Agent tool's `effort`; with two fields it passes
+no effort. `job.json` `efforts` is saved before the line is printed.
 
 ### Stages
 

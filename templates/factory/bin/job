@@ -19,7 +19,7 @@
     factory/bin/job check <id>           run checks.sh in the job's worktree (read-only; for the builder)
 
 `next` prints exactly one of:
-    <id> <stage> SPAWN <agent>:<model> [<agent>:<model> ...] [out=<file>,...]
+    <id> <stage> SPAWN <agent>:<model>[:<effort>] [<agent>:<model>[:<effort>] ...] [out=<file>,...]
     <id> <stage> WAIT <author|human> <note>
     <id> <stage> DONE <merged|rejected>
     ERROR <message>
@@ -246,8 +246,34 @@ def jpath(job, name):
     return job_dir(job["id"]) / name
 
 
+_EFFORTS_CHANGED = set()  # job ids whose job["efforts"] changed since the last spawn() line
+
+
+def token(config, job, agent, model):
+    """One SPAWN token, "<agent>:<model>" or "<agent>:<model>:<effort>". Records the
+    effort of this spawn in job["efforts"] (key dropped when there is none; the
+    whole field dropped when empty). spawn() saves the job if that changed."""
+    effort = F.effort_for(config, agent)
+    old = job.get("efforts")
+    efforts = dict(old) if isinstance(old, dict) else {}
+    if effort:
+        efforts[agent] = effort
+    else:
+        efforts.pop(agent, None)
+    if efforts != (old if isinstance(old, dict) else {}) or (old is not None and not efforts):
+        if efforts:
+            job["efforts"] = efforts
+        else:
+            job.pop("efforts", None)
+        _EFFORTS_CHANGED.add(job["id"])
+    return "%s:%s:%s" % (agent, model, effort) if effort else "%s:%s" % (agent, model)
+
+
 def spawn(job, *agents, out=None):
-    line = "%s %s SPAWN %s" % (job["id"], job["stage"], " ".join(agents))
+    if job["id"] in _EFFORTS_CHANGED:
+        _EFFORTS_CHANGED.discard(job["id"])
+        save(job)  # the record must not depend on refresh_cost, which swallows errors
+    line ="%s %s SPAWN %s" % (job["id"], job["stage"], " ".join(agents))
     if out:
         line += " out=" + ",".join(out)
     return line
@@ -319,7 +345,7 @@ def next_round(config, job, note, files_note=""):
         mark(config, job, "needs-human")
         return wait(job, "human", job["note"])
     move(job, "build", note, round_inc=True)
-    return spawn(job, "builder:" + job["models"]["builder"], out=["build-%d.md" % job["round"]])
+    return spawn(job, token(config, job, "builder", job["models"]["builder"]), out=["build-%d.md" % job["round"]])
 
 
 def push_and_pr(config, job):
@@ -379,13 +405,13 @@ def step(config, job):
     if st == "intake":
         f = jpath(job, "intake.md")
         if not f.exists():
-            return spawn(job, "intake:" + m["intake"], out=["intake.md"])
+            return spawn(job, token(config, job, "intake", m["intake"]), out=["intake.md"])
         text = f.read_text()
         dec = F.verdict(text, "Decision", {"ACCEPT", "NEEDS-INFO", "REJECT"})
         risk = (F.verdict(text, "Risk", set(F.RISKS) | {x.upper() for x in F.RISKS}) or "").lower() or None
         if not dec or (dec == "ACCEPT" and risk not in F.RISKS):
             if invalidate(f):
-                return spawn(job, "intake:" + m["intake"], out=["intake.md"])
+                return spawn(job, token(config, job, "intake", m["intake"]), out=["intake.md"])
             return "ERROR %s: intake.md has no valid Decision/Risk lines twice in a row" % job["id"]
         job["verdicts"]["intake"] = dec
         if dec == "REJECT":
@@ -417,7 +443,7 @@ def step(config, job):
             return "ERROR %s: could not create worktree: %s" % (job["id"], e)
         move(job, "spec", "ACCEPT risk=%s surfaces=%s reviewers=%s" % (
             risk, ",".join(job["surfaces"]) or "none", ",".join(r["name"] for r in job["reviewers"]) or "none"))
-        return spawn(job, "spec-writer:" + m["spec-writer"], out=["spec.md"])
+        return spawn(job, token(config, job, "spec-writer", m["spec-writer"]), out=["spec.md"])
 
     if st == "needs-info":
         tmp = jpath(job, ".issue.new.md")
@@ -433,18 +459,18 @@ def step(config, job):
         if jpath(job, "intake.md").exists():
             jpath(job, "intake.md").rename(jpath(job, "intake-%d.md" % k))
         move(job, "intake", "author replied")
-        return spawn(job, "intake:" + m["intake"], out=["intake.md"])
+        return spawn(job, token(config, job, "intake", m["intake"]), out=["intake.md"])
 
     if st == "spec":
         if not jpath(job, "spec.md").exists():
-            return spawn(job, "spec-writer:" + m["spec-writer"], out=["spec.md"])
+            return spawn(job, token(config, job, "spec-writer", m["spec-writer"]), out=["spec.md"])
         move(job, "build", "spec written", round_inc=True)
-        return spawn(job, "builder:" + m["builder"], out=["build-%d.md" % job["round"]])
+        return spawn(job, token(config, job, "builder", m["builder"]), out=["build-%d.md" % job["round"]])
 
     if st == "build":
         out = "build-%d.md" % job["round"]
         if not jpath(job, out).exists():
-            return spawn(job, "builder:" + m["builder"], out=[out])
+            return spawn(job, token(config, job, "builder", m["builder"]), out=[out])
         move(job, "gate", "build round %d done" % job["round"])
         st = "gate"
 
@@ -481,7 +507,7 @@ def step(config, job):
             got[rev["name"]] = v
         save(job)
         if missing:
-            return spawn(job, *["%s:%s" % (x["name"], x["model"]) for x in missing],
+            return spawn(job, *[token(config, job, x["name"], x["model"]) for x in missing],
                          out=["review-%s-%s.md" % (r, x["name"]) for x in missing])
         changes = [n for n, v in got.items() if v != "PASS"]
         if changes:
@@ -493,11 +519,11 @@ def step(config, job):
         out = "approve-%d.md" % job["round"]
         f = jpath(job, out)
         if not f.exists():
-            return spawn(job, "approver:" + m["approver"], out=[out])
+            return spawn(job, token(config, job, "approver", m["approver"]), out=[out])
         dec = F.verdict(f.read_text(), "Decision", {"APPROVE", "ESCALATE"})
         if dec is None:
             if invalidate(f):
-                return spawn(job, "approver:" + m["approver"], out=[out])
+                return spawn(job, token(config, job, "approver", m["approver"]), out=[out])
             dec = "ESCALATE"
         job["verdicts"]["approve"][str(job["round"])] = dec
         if dec == "ESCALATE":
@@ -643,7 +669,7 @@ def cmd_feedback(config, job, text):
             mark(config, job, "active")
         job["max_rounds"] = max(job["max_rounds"], job["round"] + 1)  # a human asked for this round
         move(job, "build", "operator feedback (%s)" % path.name, round_inc=True)
-        return spawn(job, "builder:" + job["models"]["builder"], out=["build-%d.md" % job["round"]])
+        return spawn(job, token(config, job, "builder", job["models"]["builder"]), out=["build-%d.md" % job["round"]])
     save(job)
     return "%s %s OK %s recorded; the next build round reads it" % (job["id"], job["stage"], path.name)
 
@@ -804,6 +830,11 @@ def main(argv):
             return cmd_check(load(args[0]))
         elif cmd in ("next", "feedback", "reject", "approve", "merge", "move", "cost") and args:
             jid = args[0]
+            if cmd in ("next", "feedback", "approve", "merge"):
+                # These can print SPAWN: refuse a bad efforts map before any lock or state change.
+                err = F.efforts_error(config)
+                if err:
+                    raise Refused(err)
             with locked(jid):
                 job = load(jid)
                 if cmd == "next":

@@ -100,6 +100,57 @@ def resolve_model(alias, config):
     return aliases.get(alias, alias)
 
 
+EFFORTS = ["low", "medium", "high", "xhigh", "max"]
+FIXED_AGENTS = ["intake", "spec-writer", "builder", "approver"]
+
+
+def _shown(v):
+    """A config value made safe to echo on one line: JSON-quoted, at most 40 characters."""
+    s = v[:40] if isinstance(v, str) else v
+    try:
+        out = json.dumps(s)
+    except (TypeError, ValueError):
+        out = repr(s)
+    return out[:40]
+
+
+def known_agents(config):
+    names = list(FIXED_AGENTS)
+    for r in config.get("reviewers") or []:
+        if isinstance(r, dict) and isinstance(r.get("name"), str):
+            names.append(r["name"])
+    return names
+
+
+def efforts_error(config):
+    """None if models.efforts is absent or valid; otherwise a one-line message."""
+    models = config.get("models")
+    if not isinstance(models, dict) or "efforts" not in models:
+        return None
+    efforts = models["efforts"]
+    allowed = "allowed: %s" % ", ".join(EFFORTS)
+    if not isinstance(efforts, dict):
+        return "config models.efforts must be an object of agent -> effort (%s)" % allowed
+    known = known_agents(config)
+    for k, v in efforts.items():
+        if k not in known:
+            return "config models.efforts key %s is not a known agent (agents: %s; %s)" % (
+                _shown(k), ", ".join(known), allowed)
+        if not isinstance(v, str) or v not in EFFORTS:
+            return "config models.efforts[%s] = %s is not a valid effort (%s)" % (_shown(k), _shown(v), allowed)
+    return None
+
+
+def effort_for(config, agent):
+    """The configured effort for agent, or None. Assumes efforts_error(config) is None."""
+    models = config.get("models")
+    efforts = models.get("efforts") if isinstance(models, dict) else None
+    if not isinstance(efforts, dict):
+        return None
+    v = efforts.get(agent)
+    return v if isinstance(v, str) and v in EFFORTS else None
+
+
 def model_for_risk(model, risk):
     """A reviewer's model is an alias, or {risk: alias}."""
     if isinstance(model, dict):
