@@ -100,6 +100,57 @@ def resolve_model(alias, config):
     return aliases.get(alias, alias)
 
 
+EFFORTS = ["low", "medium", "high", "xhigh", "max"]
+FIXED_AGENTS = ["intake", "spec-writer", "builder", "approver"]
+
+
+def _shown(v):
+    """A config value made safe to echo on one line: JSON-quoted, at most 40 characters."""
+    s = v[:38] if isinstance(v, str) else v  # 38 + two quotes
+    try:
+        out = json.dumps(s)
+    except (TypeError, ValueError):
+        out = repr(s)
+    return out[:40]
+
+
+def known_agents(config):
+    names = list(FIXED_AGENTS)
+    for r in config.get("reviewers") or []:
+        if isinstance(r, dict) and isinstance(r.get("name"), str):
+            names.append(r["name"])
+    return names
+
+
+def efforts_error(config):
+    """None if models.efforts is absent or valid; otherwise a one-line message."""
+    models = config.get("models")
+    if not isinstance(models, dict) or "efforts" not in models:
+        return None
+    efforts = models["efforts"]
+    allowed = "allowed: %s" % ", ".join(EFFORTS)
+    if not isinstance(efforts, dict):
+        return "config models.efforts must be an object of agent -> effort (%s)" % allowed
+    known = known_agents(config)
+    for k, v in efforts.items():
+        if k not in known:
+            return "config models.efforts key %s is not a known agent (agents: %s; %s)" % (
+                _shown(k), ", ".join(known), allowed)
+        if not isinstance(v, str) or v not in EFFORTS:
+            return "config models.efforts[%s] = %s is not a valid effort (%s)" % (_shown(k), _shown(v), allowed)
+    return None
+
+
+def effort_for(config, agent):
+    """The configured effort for agent, or None. Assumes efforts_error(config) is None."""
+    models = config.get("models")
+    efforts = models.get("efforts") if isinstance(models, dict) else None
+    if not isinstance(efforts, dict):
+        return None
+    v = efforts.get(agent)
+    return v if isinstance(v, str) and v in EFFORTS else None
+
+
 def model_for_risk(model, risk):
     """A reviewer's model is an alias, or {risk: alias}."""
     if isinstance(model, dict):
@@ -150,6 +201,48 @@ def run(cmd, cwd=None, check=False, input=None, timeout=None, env=None):
 
 def git(*args, cwd=None, check=True):
     return run(["git"] + list(args), cwd=cwd or ROOT, check=check)
+
+
+def _git_dirs(cwd, *flags):
+    """Resolved paths printed by `git rev-parse <flags>` run in cwd, or None on any
+    failure (git missing, timeout, not a repo). Relative output is joined to cwd."""
+    try:
+        p = run(["git", "rev-parse"] + list(flags), cwd=cwd, timeout=10)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    lines = p.stdout.splitlines() if p.returncode == 0 else []
+    if len(lines) != len(flags):
+        return None
+    try:
+        return [(Path(cwd) / line).resolve() for line in lines]
+    except (OSError, RuntimeError, ValueError):
+        return None
+
+
+def main_checkout_error():
+    """None when the caller's cwd is inside the main checkout ROOT; otherwise the
+    message telling the user where to run /factory. Fails closed: if git cannot
+    answer for the cwd or for ROOT, the cwd is treated as a mismatch."""
+    try:
+        root = ROOT.resolve()
+    except (OSError, RuntimeError):
+        root = ROOT
+    try:
+        cwd = Path(os.getcwd()).resolve()
+    except (OSError, RuntimeError):
+        cwd = None
+    shown = str(cwd) if cwd is not None else (os.environ.get("PWD") or "?")
+    msg = "run /factory from %s (this session is in %s); project permissions only apply there" % (root, shown)
+    if cwd is None:
+        return msg
+    here = _git_dirs(cwd, "--show-toplevel", "--git-common-dir")
+    there = _git_dirs(root, "--git-common-dir")
+    if here is None or there is None:
+        return msg
+    toplevel, common = here
+    if toplevel == root and common == there[0]:
+        return None
+    return msg
 
 
 def section(text, heading):

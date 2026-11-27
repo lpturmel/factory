@@ -64,3 +64,8 @@ answer it. APPROVE: one or two lines for the PR/merge record.>
 ```
 
 Reply with one line, e.g. `approver ESCALATE: migration drops a column`.
+If you have no tool that can write files, or writing your `Write:` file
+fails or is denied, reply with exactly one line that starts with `ERROR`, e.g.
+`ERROR approver could not write <file>: <reason>` (for instance `no Write tool`).
+That line carries no verdict or success wording. Don't try to write the file
+another way (Bash `echo`, `cat >`, a heredoc).

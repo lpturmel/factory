@@ -59,6 +59,9 @@ a command that isn't pre-approved is simply denied. So:
   checkout's `factory/checks.sh` in your worktree and ends with
   `CHECKS PASS` or `CHECKS FAIL`. A stop hook runs the same checks and sends
   you back if they fail; the gate decides either way.
+- If you run or import the repo's Python scripts by hand, set
+  `PYTHONDONTWRITEBYTECODE=1`. Never leave a `__pycache__/` directory in the
+  worktree.
 - To mark a script executable, `chmod +x <absolute path>`.
 - If you can't finish (spec contradiction, missing access), commit what is
   sound and say exactly what blocks you in your build file.
@@ -90,3 +93,8 @@ Write exactly one file, the `Write:` path (`<folder>/build-<n>.md`):
 ```
 
 Reply with one line, e.g. `builder round 2: 3 commits, checks pass`.
+If you have no tool that can write files, or writing your `Write:` file
+fails or is denied, reply with exactly one line that starts with `ERROR`, e.g.
+`ERROR builder could not write <file>: <reason>` (for instance `no Write tool`).
+That line carries no verdict or success wording. Don't try to write the file
+another way (Bash `echo`, `cat >`, a heredoc).
