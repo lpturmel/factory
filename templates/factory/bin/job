@@ -21,7 +21,7 @@
     factory/bin/job check <id>           run checks.sh in the job's worktree (read-only; for the builder)
 
 `next` prints exactly one of:
-    <id> <stage> SPAWN <agent>:<model> [<agent>:<model> ...] [out=<file>,...]
+    <id> <stage> SPAWN <agent>:<model>[:<effort>] [<agent>:<model>[:<effort>] ...] [out=<file>,...]
     <id> <stage> WAIT <author|human> <note>
     <id> <stage> DONE <merged|rejected>
     ERROR <id>: <agent> did not write <file>[; <agent> did not write <file> ...]
@@ -254,12 +254,46 @@ def jpath(job, name):
     return job_dir(job["id"]) / name
 
 
+def token(config, agent, model):
+    """One SPAWN token, "<agent>:<model>" or "<agent>:<model>:<effort>" when the
+    current config sets an effort for that agent."""
+    effort = F.effort_for(config, agent)
+    return "%s:%s:%s" % (agent, model, effort) if effort else "%s:%s" % (agent, model)
+
+
+def record_efforts(job, agents):
+    """Set job["efforts"] to the effort of each agent's spawn in these tokens (key
+    dropped when a token has none; the whole field dropped when empty).
+    Returns True if the record changed."""
+    old = job.get("efforts")
+    efforts = dict(old) if isinstance(old, dict) else {}
+    for tok in agents:
+        parts = tok.split(":")
+        if len(parts) >= 3:
+            efforts[parts[0]] = parts[2]
+        else:
+            efforts.pop(parts[0], None)
+    if efforts == old:
+        return False
+    if efforts:
+        job["efforts"] = efforts
+    elif "efforts" in job:
+        del job["efforts"]
+    else:
+        return False
+    return True
+
+
 def spawn(job, *agents, out=None):
-    """The SPAWN line. Counts every out file in job["spawns"] and saves first."""
+    """The SPAWN line. Counts every out file in job["spawns"], records each
+    agent's effort in job["efforts"], and saves first (the record must not
+    depend on refresh_cost, which swallows errors)."""
+    changed = record_efforts(job, agents)
     if out:
         counts = job.setdefault("spawns", {})
         for name in out:
             counts[name] = counts.get(name, 0) + 1
+    if out or changed:
         save(job)
     line = "%s %s SPAWN %s" % (job["id"], job["stage"], " ".join(agents))
     if out:
@@ -347,7 +381,7 @@ def next_round(config, job, note, files_note=""):
         mark(config, job, "needs-human")
         return wait(job, "human", job["note"])
     move(job, "build", note, round_inc=True)
-    return spawn(job, "builder:" + job["models"]["builder"], out=["build-%d.md" % job["round"]])
+    return spawn(job, token(config, "builder", job["models"]["builder"]), out=["build-%d.md" % job["round"]])
 
 
 def push_and_pr(config, job):
@@ -407,13 +441,13 @@ def step(config, job):
     if st == "intake":
         f = jpath(job, "intake.md")
         if not f.exists():
-            return spawn_missing(job, [("intake:" + m["intake"], "intake.md")])
+            return spawn_missing(job, [(token(config, "intake", m["intake"]), "intake.md")])
         text = f.read_text()
         dec = F.verdict(text, "Decision", {"ACCEPT", "NEEDS-INFO", "REJECT"})
         risk = (F.verdict(text, "Risk", set(F.RISKS) | {x.upper() for x in F.RISKS}) or "").lower() or None
         if not dec or (dec == "ACCEPT" and risk not in F.RISKS):
             if invalidate(f):
-                return spawn(job, "intake:" + m["intake"], out=["intake.md"])
+                return spawn(job, token(config, "intake", m["intake"]), out=["intake.md"])
             return "ERROR %s: intake.md has no valid Decision/Risk lines twice in a row" % job["id"]
         job["verdicts"]["intake"] = dec
         if dec == "REJECT":
@@ -445,7 +479,7 @@ def step(config, job):
             return "ERROR %s: could not create worktree: %s" % (job["id"], e)
         move(job, "spec", "ACCEPT risk=%s surfaces=%s reviewers=%s" % (
             risk, ",".join(job["surfaces"]) or "none", ",".join(r["name"] for r in job["reviewers"]) or "none"))
-        return spawn(job, "spec-writer:" + m["spec-writer"], out=["spec.md"])
+        return spawn(job, token(config, "spec-writer", m["spec-writer"]), out=["spec.md"])
 
     if st == "needs-info":
         tmp = jpath(job, ".issue.new.md")
@@ -462,18 +496,18 @@ def step(config, job):
             jpath(job, "intake.md").rename(jpath(job, "intake-%d.md" % k))
         job.setdefault("spawns", {}).pop("intake.md", None)
         move(job, "intake", "author replied")
-        return spawn(job, "intake:" + m["intake"], out=["intake.md"])
+        return spawn(job, token(config, "intake", m["intake"]), out=["intake.md"])
 
     if st == "spec":
         if not jpath(job, "spec.md").exists():
-            return spawn_missing(job, [("spec-writer:" + m["spec-writer"], "spec.md")])
+            return spawn_missing(job, [(token(config, "spec-writer", m["spec-writer"]), "spec.md")])
         move(job, "build", "spec written", round_inc=True)
-        return spawn(job, "builder:" + m["builder"], out=["build-%d.md" % job["round"]])
+        return spawn(job, token(config, "builder", m["builder"]), out=["build-%d.md" % job["round"]])
 
     if st == "build":
         out = "build-%d.md" % job["round"]
         if not jpath(job, out).exists():
-            return spawn_missing(job, [("builder:" + m["builder"], out)])
+            return spawn_missing(job, [(token(config, "builder", m["builder"]), out)])
         move(job, "gate", "build round %d done" % job["round"])
         st = "gate"
 
@@ -493,11 +527,11 @@ def step(config, job):
     if st == "review":
         r = str(job["round"])
         got = job["verdicts"]["review"].setdefault(r, {})
-        missing = []    # (agent:model, out file), in reviewer order
+        missing = []    # (reviewer, out file), in reviewer order; tokens built at spawn time
         respawn = set()  # out files set aside by invalidate(): respawned uncapped, as before
         for rev in job["reviewers"]:
             name = "review-%s-%s.md" % (r, rev["name"])
-            pair = ("%s:%s" % (rev["name"], rev["model"]), name)
+            pair = (rev, name)
             f = jpath(job, name)
             if rev["name"] in got:
                 continue
@@ -514,7 +548,8 @@ def step(config, job):
             got[rev["name"]] = v
         save(job)
         if missing:
-            return spawn_missing(job, missing, uncapped=respawn)
+            return spawn_missing(job, [(token(config, rev["name"], rev["model"]), name)
+                                       for rev, name in missing], uncapped=respawn)
         changes = [n for n, v in got.items() if v != "PASS"]
         if changes:
             return next_round(config, job, "CHANGES from " + ", ".join(changes))
@@ -525,11 +560,11 @@ def step(config, job):
         out = "approve-%d.md" % job["round"]
         f = jpath(job, out)
         if not f.exists():
-            return spawn_missing(job, [("approver:" + m["approver"], out)])
+            return spawn_missing(job, [(token(config, "approver", m["approver"]), out)])
         dec = F.verdict(f.read_text(), "Decision", {"APPROVE", "ESCALATE"})
         if dec is None:
             if invalidate(f):
-                return spawn(job, "approver:" + m["approver"], out=[out])
+                return spawn(job, token(config, "approver", m["approver"]), out=[out])
             dec = "ESCALATE"
         job["verdicts"]["approve"][str(job["round"])] = dec
         if dec == "ESCALATE":
@@ -675,7 +710,7 @@ def cmd_feedback(config, job, text):
             mark(config, job, "active")
         job["max_rounds"] = max(job["max_rounds"], job["round"] + 1)  # a human asked for this round
         move(job, "build", "operator feedback (%s)" % path.name, round_inc=True)
-        return spawn(job, "builder:" + job["models"]["builder"], out=["build-%d.md" % job["round"]])
+        return spawn(job, token(config, "builder", job["models"]["builder"]), out=["build-%d.md" % job["round"]])
     save(job)
     return "%s %s OK %s recorded; the next build round reads it" % (job["id"], job["stage"], path.name)
 
@@ -849,6 +884,11 @@ def main(argv):
             return cmd_check(load(args[0]))
         elif cmd in ("next", "feedback", "reject", "approve", "merge", "move", "cost", "retry") and args:
             jid = args[0]
+            if cmd in ("next", "feedback", "approve", "merge"):
+                # These can print SPAWN: refuse a bad efforts map before any lock or state change.
+                err = F.efforts_error(config)
+                if err:
+                    raise Refused(err)
             with locked(jid):
                 job = load(jid)
                 if cmd == "next":

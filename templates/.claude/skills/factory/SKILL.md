@@ -50,11 +50,14 @@ it doesn't, show the usage (`run [<id>] | status | approve <id> | reject <id>
    `next` can take minutes when it runs the gate; run it with
    `run_in_background` when other jobs are waiting on you.
 3. Act on the line:
-   - `<id> <stage> SPAWN <agent>:<model> [<agent>:<model> ...] out=<f>[,<f>...]`
-     → spawn each listed agent **in the background**, all at once (reviewers
+   - `<id> <stage> SPAWN <agent>:<model>[:<effort>] [<agent>:<model>[:<effort>] ...] out=<f>[,<f>...]`
+     → split each token on `:` into agent, model and an optional effort.
+     Spawn each listed agent **in the background**, all at once (reviewers
      run in parallel), using the Agent tool with `subagent_type` = agent,
-     `model` = model, and exactly this prompt (paths absolute, `<n>` from
-     `factory/bin/job show <id> round` only if you don't already know it):
+     `model` = model, `effort` = the third field when the token has one (pass
+     no `effort` at all when it has only two fields), and exactly this prompt
+     (paths absolute, `<n>` from `factory/bin/job show <id> round` only if you
+     don't already know it):
 
      ```
      Factory job: <absolute path to factory/jobs/<id>>
