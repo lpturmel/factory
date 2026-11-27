@@ -90,3 +90,6 @@ Write exactly one file, the `Write:` path (`<folder>/build-<n>.md`):
 ```
 
 Reply with one line, e.g. `builder round 2: 3 commits, checks pass`.
+If writing your `Write:` file fails or is denied, your one-line reply must be
+an error naming the file and the failure, e.g.
+`builder ERROR: could not write <file>: <reason>`, and never a success line.

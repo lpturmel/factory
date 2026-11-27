@@ -69,3 +69,6 @@ Verdict: PASS | CHANGES
 ```
 
 Reply with one line, e.g. `{{NAME}} CHANGES (2 blocking)`.
+If writing your `Write:` file fails or is denied, your one-line reply must be
+an error naming the file and the failure, e.g.
+`{{NAME}} ERROR: could not write <file>: <reason>`, and never a success line.
