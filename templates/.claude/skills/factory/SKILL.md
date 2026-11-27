@@ -38,7 +38,12 @@ it doesn't, show the usage (`run [<id>] | status | approve <id> | reject <id>
 1. `factory/bin/job sync` — starts new jobs from the backlog up to
    `concurrency` and prints `<id> <stage>` for every open job. This is also
    how a fresh session resumes: whatever is in `factory/jobs/` continues from
-   its stage.
+   its stage. If `sync` prints `ERROR <message>`, **stop the whole run**: run
+   no `next` for any job and tell the user the message. For
+   `ERROR run /factory from <folder> ...`, this session is not in the main
+   checkout (e.g. a worktree session) and project permissions don't apply
+   here: tell the user to open a Claude Code session in that folder and run
+   `/factory` again.
 2. For every printed job that has **no agent of yours still running**, run
    `factory/bin/job next <id>`. It does the deterministic work for that stage
    (routing, worktree, push, draft PR, gate, merge) and prints one line.
@@ -70,7 +75,8 @@ it doesn't, show the usage (`run [<id>] | status | approve <id> | reject <id>
    of a job's running agents** (e.g. every reviewer) before calling
    `factory/bin/job next <id>` for that job again; then go to step 3.
 5. Whenever a job reaches `WAIT` or `DONE`, run `factory/bin/job sync` again
-   so a freed slot starts the next backlog item, and `next` any new job.
+   so a freed slot starts the next backlog item, and `next` any new job. If
+   that `sync` prints `ERROR`, handle it as in step 1: stop and tell the user.
 6. Stop when no agent of yours is running, every open job is `WAIT` or
    `ERROR`, and `sync` started nothing new. Report a short table: each job,
    its stage, and what it waits on (for `needs-human`, the note and the PR

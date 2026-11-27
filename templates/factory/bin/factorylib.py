@@ -152,6 +152,48 @@ def git(*args, cwd=None, check=True):
     return run(["git"] + list(args), cwd=cwd or ROOT, check=check)
 
 
+def _git_dirs(cwd, *flags):
+    """Resolved paths printed by `git rev-parse <flags>` run in cwd, or None on any
+    failure (git missing, timeout, not a repo). Relative output is joined to cwd."""
+    try:
+        p = run(["git", "rev-parse"] + list(flags), cwd=cwd, timeout=10)
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
+    lines = p.stdout.splitlines() if p.returncode == 0 else []
+    if len(lines) != len(flags):
+        return None
+    try:
+        return [(Path(cwd) / line).resolve() for line in lines]
+    except (OSError, RuntimeError, ValueError):
+        return None
+
+
+def main_checkout_error():
+    """None when the caller's cwd is inside the main checkout ROOT; otherwise the
+    message telling the user where to run /factory. Fails closed: if git cannot
+    answer for the cwd or for ROOT, the cwd is treated as a mismatch."""
+    try:
+        root = ROOT.resolve()
+    except (OSError, RuntimeError):
+        root = ROOT
+    try:
+        cwd = Path(os.getcwd()).resolve()
+    except (OSError, RuntimeError):
+        cwd = None
+    shown = str(cwd) if cwd is not None else (os.environ.get("PWD") or "?")
+    msg = "run /factory from %s (this session is in %s); project permissions only apply there" % (root, shown)
+    if cwd is None:
+        return msg
+    here = _git_dirs(cwd, "--show-toplevel", "--git-common-dir")
+    there = _git_dirs(root, "--git-common-dir")
+    if here is None or there is None:
+        return msg
+    toplevel, common = here
+    if toplevel == root and common == there[0]:
+        return None
+    return msg
+
+
 def section(text, heading):
     """Body of '## <heading>' up to the next '## ' heading, or None."""
     m = re.search(r"^##\s+%s\s*$(.*?)(?=^##\s|\Z)" % re.escape(heading), text, re.M | re.S)
