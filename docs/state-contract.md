@@ -130,6 +130,10 @@ Written **only** by `factory/bin/job`.
     "merge_gate": {}
   },
   "issue_hash": "9f2c…",
+  "spawns": {
+    "intake.md": 1, "spec.md": 1, "build-1.md": 1, "build-2.md": 1,
+    "review-2-code-reviewer.md": 1, "review-2-ux-reviewer.md": 1, "review-2-ui-reviewer.md": 2
+  },
   "cost": {
     "usd": 1.8342,
     "input_tokens": 120034,
@@ -184,6 +188,7 @@ Written **only** by `factory/bin/job`.
 | `verdicts.approve` | `{round: "APPROVE"\|"ESCALATE"}` | Approver decision per round. |
 | `verdicts.merge_gate` | `{round: "PASS"\|"FAIL"}` | The gate re-run after syncing with the base before merging. |
 | `issue_hash` | string \| null | sha256 of `issue.md` when intake last ran (or after the factory's own comment); a change while `needs-info` wakes the job. Internal. |
+| `spawns` | `{out file: int}` | How many times `next` has asked for each out file (every SPAWN line counts, saved before the line is printed). Internal, see [spawn limit](#spawn-limit). Missing in older jobs; means `{}`. |
 | `cost` | object \| null | API-equivalent spend of this job's subagents, see [cost](#cost). |
 | `created_at`, `updated_at` | timestamp | |
 | `stage_entered_at` | timestamp | When the current `stage` was entered (time-in-stage = now − this). |
@@ -241,6 +246,32 @@ Suggested dashboard columns: **Queue** (`intake`, `needs-info`),
 **Building** (`spec`, `build`, `gate`), **Review** (`review`, `approve`,
 `merging`), **Needs you** (`needs-human`, plus `needs-info` if you also want
 author waits there), **Done** (`merged`, `rejected`).
+
+### Spawn limit
+
+When an agent's out file is missing, `job next` spawns that agent again, but at
+most twice per out file (`MAX_SPAWNS = 2`: the first run and one retry). On the
+next call after that it prints, every time until something changes:
+
+```
+ERROR <id>: <agent> did not write <out file>
+```
+
+In review, every reviewer that ran out of spawns is listed, joined by `; `
+(`ERROR gh-42: code-reviewer did not write review-2-code-reviewer.md; ui-reviewer did not write review-2-ui-reviewer.md`);
+nothing is spawned, and verdicts already recorded are kept.
+
+- Counts are per out file name, so a new round's `build-<n>.md`,
+  `review-<n>-*.md` and `approve-<n>.md` start at zero. The `intake.md` count
+  is reset when the author replies to a NEEDS-INFO.
+- A respawn after a malformed file (no parseable verdict) is counted but not
+  capped, so the "malformed twice in a row" outcomes are unchanged.
+- Recovery: the job continues on the next `next` once the missing file
+  exists. Or a human runs `factory/bin/job retry <id>`, which removes the
+  `spawns` entries whose file does not exist and prints
+  `<id> <stage> OK retry: cleared <files>` (or `OK retry: nothing to clear`);
+  the next `next` spawns again. `retry` is refused for `merged` / `rejected`
+  jobs. Never edit `job.json` by hand.
 
 ### Cost
 

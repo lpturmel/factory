@@ -72,6 +72,12 @@ it doesn't, show the usage (`run [<id>] | status | approve <id> | reject <id>
      n-th agent gets the n-th `out` file.
    - `<id> <stage> WAIT <author|human> <note>` → nothing to do for this job now.
    - `<id> <stage> DONE <merged|rejected>` → the job is finished.
+   - `ERROR <id>: <agent> did not write <file>` → the agent was spawned twice
+     and its out file still doesn't exist. Stop working that job and tell the
+     user. The likely cause is that the agent's Write was denied (for example
+     a session running outside the main checkout, or a permission prompt that
+     was refused). Don't re-spawn the agent and don't run `job retry` on your
+     own; the user decides (see **Retry** below).
    - `ERROR <message>` → stop working that job and tell the user the message.
      Don't try to fix state by hand.
 4. When a background agent finishes, note its one-line reply. **Wait for all
@@ -142,6 +148,9 @@ with AskUserQuestion which one. Then decide what they want:
 - **Reject** ("drop", "reject", "won't do"): pass their reason the same way
   to `factory/bin/job reject <id>`. The reason goes on the issue, the PR
   closes, the job is done.
+- **Retry** ("retry", "try again", typically after a `did not write` ERROR):
+  `factory/bin/job retry <id>`, then `factory/bin/job next <id>`, and act on
+  its line as in Run step 3.
 
 This path never approves. If the words read as an approval ("merge it",
 "ship it", "approve", "lgtm"), run nothing and reply with the exact command

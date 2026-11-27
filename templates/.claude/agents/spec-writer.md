@@ -57,3 +57,6 @@ Keep it as short as the change allows. Don't write code beyond small
 signatures. Don't plan edits to `protected_paths` from `factory/config.json`.
 
 Reply with one line, e.g. `spec-writer wrote spec.md (5 criteria, 3 files)`.
+If writing your `Write:` file fails or is denied, your one-line reply must be
+an error naming the file and the failure, e.g.
+`spec-writer ERROR: could not write <file>: <reason>`, and never a success line.
