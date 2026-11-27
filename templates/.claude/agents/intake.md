@@ -62,6 +62,8 @@ Surfaces: ui, security | none
 ```
 
 Then reply with one line, e.g. `intake ACCEPT risk=medium surfaces=ui`.
-If writing your `Write:` file fails or is denied, your one-line reply must be
-an error naming the file and the failure, e.g.
-`intake ERROR: could not write <file>: <reason>`, and never a success line.
+If you have no tool that can write files, or writing your `Write:` file
+fails or is denied, reply with exactly one line that starts with `ERROR`, e.g.
+`ERROR intake could not write <file>: <reason>` (for instance `no Write tool`).
+That line carries no verdict or success wording. Don't try to write the file
+another way (Bash `echo`, `cat >`, a heredoc).
