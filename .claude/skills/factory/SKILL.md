@@ -18,6 +18,14 @@ read agent files unless the user asks or something is wrong.
 Run every command from the project root (the main checkout). Never `cd` into a
 worktree.
 
+**Every job has its own git worktree**, which `factory/bin/job` manages: `job
+next` creates it at `factory/worktrees/<id>` on branch `factory/<id>` when
+intake accepts the job, and removes it once the job is merged or rejected.
+Every agent after intake (spec-writer, builder, reviewers, approver) works in
+that worktree, finding the path in `job.json`; intake runs before it exists.
+So spawn agents **without** the Agent tool's `isolation` option: a worktree
+of its own would put the agent's work outside the job's worktree and branch.
+
 ## Arguments: `$ARGUMENTS`
 
 - `run` (or empty) → [Run](#run).

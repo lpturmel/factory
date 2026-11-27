@@ -7,9 +7,14 @@ what exactly, the code, is it good). Every stage leaves a file behind that
 opens with a short summary, so you can see what happened and why.
 
 ```
-backlog → intake (fable) → route → spec-writer (opus) → builder (opus)
+backlog → intake (fable) → route → worktree → spec-writer (opus) → builder (opus)
         → gate (checks.sh) → reviewers (routed, parallel) → approver (opus) → merge
 ```
+
+Each accepted job gets its own git worktree at `factory/worktrees/<id>` on
+branch `factory/<id>`, created after intake and removed once the job is merged
+or rejected. Every agent after intake works there, never in the main checkout,
+so jobs can run side by side without touching your working tree.
 
 This repo holds:
 
