@@ -117,7 +117,7 @@ def validate(a):
 
 def shown(v):
     """A value made safe to echo on one line: JSON-quoted, at most 40 characters."""
-    s = v[:40] if isinstance(v, str) else v
+    s = v[:38] if isinstance(v, str) else v  # 38 + two quotes
     try:
         out = json.dumps(s)
     except (TypeError, ValueError):
