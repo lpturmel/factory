@@ -79,7 +79,9 @@ The legal moves are in `TRANSITIONS` at the top of `factory/bin/job`.
 `factory` issue. Nothing runs in GitHub Actions or on a schedule: the factory
 runs on your machine, on your Claude plan, when you start it. An issue can't
 start a Claude Code session by itself, and keeping it local means your
-worktrees, dev servers and dashboard are right there.
+worktrees, dev servers and dashboard are right there. `/factory run <id>`
+drives just that one job (creating it from a ready backlog item if needed),
+bypassing `concurrency` and leaving every other job alone.
 
 **One orchestrator for every job.** The session running `/factory run` starts up
 to `concurrency` jobs and spawns every agent as a background subagent. There
@@ -133,11 +135,13 @@ gated again, because another job may have merged since it was tested.
 
 **You approve by merging.** The approver merges what it would merge itself and
 escalates the rest with a specific question. An escalated PR is ready for
-review and its issue is labeled `factory:needs-human`. Merge it to approve, or
-tell the factory what to change with `/factory <anything>`: your words go to
-the builder as `feedback-<k>.md` and the job runs another round. To drop a
-job that waits on you or on its author, tell the factory to reject it: the
-reason goes on the issue, its PR closes, and the job moves to Done.
+review and its issue is labeled `factory:needs-human`. Merge it on GitHub or
+run `/factory approve <id>` to approve, or tell the factory what to change with
+`/factory <anything else>`: your words go to the builder as `feedback-<k>.md`
+and the job runs another round. Free-form words never approve; only the
+explicit command does. To drop a job that waits on you or on its author, run
+`/factory reject <id> <why>`: the reason goes on the issue, its PR closes, and
+the job moves to Done.
 
 **State is files, so runs resume.** Every fact the orchestrator needs is in
 `factory/jobs/`. If the session dies or compacts, a fresh `/factory run` reads

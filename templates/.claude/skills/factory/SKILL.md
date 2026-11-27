@@ -1,7 +1,7 @@
 ---
 name: factory
-description: Run this project's software factory. `/factory run` drains the backlog into merged code through intake, spec, build, gate, review and approval. `/factory status` lists jobs. `/factory <anything else>` sends your words to a job's builder, approves it, or rejects it.
-argument-hint: run | status | <feedback, approve or reject for a job>
+description: Run this project's software factory. `/factory run` drains the backlog into merged code through intake, spec, build, gate, review and approval. `/factory run <id>` drives just that one job. `/factory status` lists jobs. `/factory approve <id>` approves a job waiting on you. `/factory reject <id> <why>` rejects one. `/factory <anything else>` sends your words to a job's builder.
+argument-hint: run [<id>] | status | approve <id> | reject <id> <why> | <feedback for a job>
 allowed-tools: Bash(factory/bin/job:*), Bash(factory/bin/backlog list), Agent, Read
 ---
 
@@ -21,16 +21,29 @@ worktree.
 ## Arguments: `$ARGUMENTS`
 
 - `run` (or empty) → [Run](#run).
+- `run <id>` → [Run one job](#run-one-job). `<id>` is a job id or a backlog
+  ref (e.g. `gh-7` or `7`).
 - `status` → run `factory/bin/job list --all` and show it as a short table
   (id, stage, round, note). Stop.
-- anything else → [Talk to a job](#talk-to-a-job).
+- `approve <id>` → [Approve](#approve).
+- `reject …` and anything else → [Talk to a job](#talk-to-a-job).
+
+Before putting any `<id>` from the user on a command line, check that it
+matches `[A-Za-z0-9._-]+` (letters, digits, `.`, `_`, `-`, nothing else). If
+it doesn't, show the usage (`run [<id>] | status | approve <id> | reject <id>
+<why> | <feedback for a job>`) and run no command.
 
 ## Run
 
 1. `factory/bin/job sync` — starts new jobs from the backlog up to
    `concurrency` and prints `<id> <stage>` for every open job. This is also
    how a fresh session resumes: whatever is in `factory/jobs/` continues from
-   its stage.
+   its stage. If `sync` prints `ERROR <message>`, **stop the whole run**: run
+   no `next` for any job and tell the user the message. For
+   `ERROR run /factory from <folder> ...`, this session is not in the main
+   checkout (e.g. a worktree session) and project permissions don't apply
+   here: tell the user to open a Claude Code session in that folder and run
+   `/factory` again.
 2. For every printed job that has **no agent of yours still running**, run
    `factory/bin/job next <id>`. It does the deterministic work for that stage
    (routing, worktree, push, draft PR, gate, merge) and prints one line.
@@ -68,16 +81,48 @@ worktree.
    of a job's running agents** (e.g. every reviewer) before calling
    `factory/bin/job next <id>` for that job again; then go to step 3.
 5. Whenever a job reaches `WAIT` or `DONE`, run `factory/bin/job sync` again
-   so a freed slot starts the next backlog item, and `next` any new job.
+   so a freed slot starts the next backlog item, and `next` any new job. If
+   that `sync` prints `ERROR`, handle it as in step 1: stop and tell the user.
 6. Stop when no agent of yours is running, every open job is `WAIT` or
    `ERROR`, and `sync` started nothing new. Report a short table: each job,
    its stage, and what it waits on (for `needs-human`, the note and the PR
    link from `factory/bin/job show <id> pr`). Mention that the user can reply
-   with `/factory <feedback>`, `/factory approve <id>` or `/factory reject <id> <why>`.
+   with `/factory <feedback>`, `/factory approve <id>`,
+   `/factory reject <id> <why>` or `/factory run <id>`.
 
 Never spawn the same agent for the same job and output file twice. If you
 lost track after a compaction, check your running background tasks before
 re-spawning anything `next` asks for.
+
+## Run one job
+
+Drive one job forward without touching any other job or pulling new work. It
+ignores `concurrency` for this job.
+
+1. `factory/bin/job pick <id>` — resolves `<id>` (a job id or a backlog ref)
+   to one job, creating it if `<id>` is a ready backlog item with no job yet.
+   It prints `<id> <stage>`, or `ERROR <message>`: then show the message and
+   stop.
+2. Loop [Run](#run) steps 2–4 for the printed id **only**. Never run
+   `factory/bin/job sync`, and never run `next` for any other job, not even
+   after this one finishes.
+3. Stop when that job's `next` prints `WAIT`, `DONE` or `ERROR` and none of
+   its agents is running. Report its stage and what it waits on (for
+   `needs-human`, the note and the PR link from `factory/bin/job show <id> pr`),
+   and the same reply commands as Run step 6.
+
+## Approve
+
+Approval is only ever this explicit command.
+
+- No `<id>`: show the usage `/factory approve <id>` and the `needs-human` jobs
+  from `factory/bin/job list`. Run nothing else.
+- Otherwise run `factory/bin/job approve <id>` (a job id as shown by
+  `/factory status`) and act on its line as in Run step 3. If it prints
+  `SPAWN` (e.g. a merge conflict sent it back to the builder), continue the
+  loop of [Run one job](#run-one-job) step 2–3 for that job only. If it prints
+  `ERROR` (unknown job, or not `needs-human`), show it to the user; nothing
+  changed.
 
 ## Talk to a job
 
@@ -97,14 +142,16 @@ with AskUserQuestion which one. Then decide what they want:
   If it prints `SPAWN`, spawn the builder as in Run step 3 and continue the
   run loop for that job. If it prints `OK … recorded`, the builder of the
   next round reads it.
-- **Approve** a `needs-human` job ("merge it", "approve", "ship it"):
-  `factory/bin/job approve <id>`, then act on its line.
 - **Reject** ("drop", "reject", "won't do"): pass their reason the same way
   to `factory/bin/job reject <id>`. The reason goes on the issue, the PR
   closes, the job is done.
 - **Retry** ("retry", "try again", typically after a `did not write` ERROR):
   `factory/bin/job retry <id>`, then `factory/bin/job next <id>`, and act on
   its line as in Run step 3.
+
+This path never approves. If the words read as an approval ("merge it",
+"ship it", "approve", "lgtm"), run nothing and reply with the exact command
+to type: `/factory approve <id>`.
 
 If it's unclear whether they mean feedback or reject, ask. Never add your
 own words to theirs.
