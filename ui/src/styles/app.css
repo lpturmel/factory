@@ -1,0 +1,99 @@
+/* App-only additions on top of fd.css (which is the design canvas's stylesheet). */
+html, body { margin: 0; background: #090b10; }
+body:has(.fd.t-light) { background: #f3f5f9; }
+.fd.shell { min-height: 100vh; }
+.fd .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.fd .skip { position: absolute; left: 12px; top: -40px; z-index: 10; padding: 8px 12px; border-radius: 8px; background: var(--surface); }
+.fd .skip:focus { top: 8px; }
+.fd main:focus { outline: none; }
+.fd .hi { color: var(--text); }
+.fd .head > div { min-width: 0; }
+.fd .head .sub > *, .fd .fpath { overflow-wrap: anywhere; min-width: 0; }
+.fd .err-text { color: var(--attn); font-size: 13px; }
+
+/* buttons that look like links / chips */
+.fd .linkish { border: 0; background: none; padding: 0; color: var(--accent); cursor: pointer; font-weight: 600; font-size: 13px; }
+.fd .linkish:hover { text-decoration: underline; }
+.fd button.cmd { cursor: pointer; text-align: left; align-self: flex-start; }
+.fd button.cmd:hover { border-color: var(--line2); }
+.fd .go { border: 0; cursor: pointer; font-size: 14px; }
+.fd .go.ghost { font-weight: 600; }
+
+/* top-bar error bar */
+.fd .errbar { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; padding: 10px 28px; background: var(--attn-bg); color: var(--text); border-bottom: 1px solid var(--attn-line); font-size: 13.5px; }
+
+/* attention */
+.fd .clear-move { display: flex; align-items: center; gap: 10px; padding: 14px 18px; border-radius: 14px; background: var(--ok-bg); color: var(--ok); box-shadow: 0 0 0 1px var(--ok-line); font-weight: 600; }
+.fd .watch-row .next { color: var(--accent); font-weight: 600; }
+.fd .decision .cmd { align-self: flex-start; }
+
+/* overview: table on desktop, cards on phones */
+.fd .f-cards { display: none; flex-direction: column; gap: 10px; }
+.fd .f-card .fname { font-size: 16px; }
+.fd .ftable tbody tr { cursor: pointer; }
+
+/* factory */
+.fd .stage-tag { white-space: nowrap; flex: none; }
+.fd .jcard .top { min-width: 0; }
+.fd .jcard .top .mono { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fd .jcard .top .risk { flex: none; }
+.fd .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 9px; overflow: hidden; }
+.fd .seg button { border: 0; background: var(--surface); color: var(--muted); padding: 6px 14px; cursor: pointer; font-size: 13px; }
+.fd .seg button + button { border-left: 1px solid var(--line); }
+.fd .seg button[aria-pressed="true"] { background: var(--surface2); color: var(--text); font-weight: 700; }
+.fd .col-empty { padding: 18px 6px; text-align: center; }
+.fd .banner.warn { background: var(--warn-bg); box-shadow: 0 0 0 1px var(--warn-line); align-items: center; }
+.fd .banner.idle { background: var(--surface); box-shadow: var(--glow); align-items: center; }
+.fd .banner.stale .big, .fd .banner.warn .big { font-size: 18px; }
+
+/* job */
+.fd .round > summary b { font-family: var(--display); font-size: 16px; }
+.fd .round .takeaway { font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 52ch; }
+.fd .round.outcome { animation: none; }
+.fd .file.compact ul { display: none; }
+.fd .file.compact .fh { border-bottom: 0; }
+.fd .file .fh { flex-wrap: wrap; }
+.fd .file .fh .open { margin-left: auto; }
+.fd .verdict-btn { border: 0; background: none; padding: 0; cursor: pointer; }
+.fd .verdict-btn:hover .v { text-decoration: underline; }
+.fd .table-scroll { overflow-x: auto; }
+.fd .node.cur.t-warn .c { background: var(--warn); border-color: var(--warn); color: #1b1203; box-shadow: 0 0 0 6px var(--warn-bg); animation: none; }
+.fd .node.cur.t-warn .l { color: var(--warn); }
+.fd .node.cur.t-run .c { background: var(--run); border-color: var(--run); color: #031520; box-shadow: 0 0 0 6px var(--run-bg); animation: none; }
+.fd .node.cur.t-run .l { color: var(--run); }
+.fd .node.cur.t-mute .c, .fd .node.cur.t-ok .c { background: var(--mute); border-color: var(--mute); color: var(--surface); box-shadow: none; animation: none; }
+.fd .node.cur.t-mute .l, .fd .node.cur.t-ok .l { color: var(--muted); }
+.fd.t-light .node.cur.t-warn .c, .fd.t-light .node.cur.t-run .c { color: #fff; }
+.fd .filelist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; max-height: 320px; overflow: auto; }
+.fd .filelist li { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; }
+.fd .filelist .linkish { font-weight: 500; font-size: 12.5px; text-align: left; }
+
+/* empty / loading */
+.fd .empty-state { display: flex; align-items: center; gap: 28px; flex-wrap: wrap; }
+.fd .loading .kpis { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+
+/* file dialog */
+.file-dialog { width: min(900px, calc(100vw - 32px)); max-height: calc(100vh - 64px); padding: 0; border: 1px solid var(--line2, #313a4e); border-radius: 16px; background: var(--surface, #121620); color: var(--text, #eef1f7); box-shadow: 0 30px 80px rgba(0,0,0,.5); }
+.file-dialog::backdrop { background: rgba(5, 7, 12, .6); backdrop-filter: blur(3px); }
+.file-dialog .dlg-head { position: sticky; top: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 18px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.file-dialog .fn { font-family: var(--mono); font-weight: 600; overflow-wrap: anywhere; }
+.file-dialog .dlg-body { padding: 18px 22px 24px; line-height: 1.6; }
+.file-dialog .log.full { margin: 0; border-radius: 10px; border: 1px solid var(--line); max-height: 70vh; }
+.md h1, .md h2, .md h3 { font-family: var(--display); margin: 18px 0 8px; }
+.md h1:first-child, .md h2:first-child { margin-top: 0; }
+.md h2 { font-size: 17px; }
+.md pre { background: var(--bg2); padding: 12px; border-radius: 10px; overflow-x: auto; font-size: 13px; }
+.md code { font-family: var(--mono); font-size: .92em; }
+.md blockquote { margin: 0; padding: 4px 14px; border-left: 3px solid var(--line2); color: var(--muted); }
+.md table { border-collapse: collapse; }
+.md td, .md th { border: 1px solid var(--line); padding: 4px 8px; }
+
+@media (max-width: 900px) {
+  .fd .f-table { display: none; }
+  .fd .f-cards { display: flex; }
+  .fd .errbar { padding: 10px 16px; }
+  .fd .loading .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .fd .go, .fd .seg button { min-height: 44px; }
+  .fd .round .takeaway { white-space: normal; max-width: none; }
+  .fd .topbar .live { order: 5; }
+}

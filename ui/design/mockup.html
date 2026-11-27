@@ -1,0 +1,951 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Factory Dashboard</title>
+<meta name="description" content="Static design mockup of the factory dashboard: all factories, one factory's pipeline board, one job's detail. Sample data only.">
+<style>
+/* ============ Tokens (see DESIGN.md §4) ============ */
+:root {
+  color-scheme: light;
+  --bg: #f7f8fa; --surface: #ffffff; --sunken: #eef0f3; --hover: #f1f3f6;
+  --border: #dfe2e7; --border-strong: #c7ccd4;
+  --text: #16181d; --text-muted: #565d6b; --text-faint: #636a76;
+  --accent: #1f56c7; --focus: #1f56c7;
+
+  --st-attn: #b3261e;  --st-attn-tint: #fdecea;  --st-attn-line: #f2b8b3;
+  --st-warn: #8a4b00;  --st-warn-tint: #fdf1dc;  --st-warn-line: #ecc98a;
+  --st-run: #1f56c7;   --st-run-tint: #e8effc;   --st-run-line: #b6c9f2;
+  --st-ok: #17733a;    --st-ok-tint: #e5f4ea;    --st-ok-line: #a9d8b8;
+  --st-mute: #535a66;  --st-mute-tint: #eceef1;  --st-mute-line: #cfd3da;
+  --st-stale: #6b4fa8; --st-stale-tint: #f0ebfa; --st-stale-line: #cdbdf0;
+
+  --font-ui: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --fs-xs: 11px; --fs-sm: 12px; --fs-md: 13px; --fs-lg: 15px; --fs-xl: 18px;
+  --lh: 1.45;
+  --sp-1: 2px; --sp-2: 4px; --sp-3: 8px; --sp-4: 12px; --sp-5: 16px; --sp-6: 24px; --sp-7: 32px;
+  --radius-sm: 3px; --radius: 6px; --radius-lg: 8px;
+  --shadow-pop: 0 8px 28px rgba(16,24,40,.18);
+  --dur: 120ms;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: #0e1014; --surface: #161920; --sunken: #1d2129; --hover: #1c2028;
+    --border: #2a2f39; --border-strong: #3a404c;
+    --text: #e5e7eb; --text-muted: #a3abb8; --text-faint: #8b93a1;
+    --accent: #8cb4ff; --focus: #8cb4ff;
+    --st-attn: #ff8a80;  --st-attn-tint: #3a1614;  --st-attn-line: #6e2a25;
+    --st-warn: #f0b85a;  --st-warn-tint: #33240b;  --st-warn-line: #6b4c14;
+    --st-run: #8cb4ff;   --st-run-tint: #14223d;   --st-run-line: #2c4677;
+    --st-ok: #6fd18f;    --st-ok-tint: #10291a;    --st-ok-line: #24553a;
+    --st-mute: #aab1bd;  --st-mute-tint: #22262e;  --st-mute-line: #3a404c;
+    --st-stale: #c3a6ff; --st-stale-tint: #251c3b; --st-stale-line: #4a3a78;
+    --shadow-pop: 0 8px 28px rgba(0,0,0,.55);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #0e1014; --surface: #161920; --sunken: #1d2129; --hover: #1c2028;
+  --border: #2a2f39; --border-strong: #3a404c;
+  --text: #e5e7eb; --text-muted: #a3abb8; --text-faint: #8b93a1;
+  --accent: #8cb4ff; --focus: #8cb4ff;
+  --st-attn: #ff8a80;  --st-attn-tint: #3a1614;  --st-attn-line: #6e2a25;
+  --st-warn: #f0b85a;  --st-warn-tint: #33240b;  --st-warn-line: #6b4c14;
+  --st-run: #8cb4ff;   --st-run-tint: #14223d;   --st-run-line: #2c4677;
+  --st-ok: #6fd18f;    --st-ok-tint: #10291a;    --st-ok-line: #24553a;
+  --st-mute: #aab1bd;  --st-mute-tint: #22262e;  --st-mute-line: #3a404c;
+  --st-stale: #c3a6ff; --st-stale-tint: #251c3b; --st-stale-line: #4a3a78;
+  --shadow-pop: 0 8px 28px rgba(0,0,0,.55);
+}
+
+/* ============ Base ============ */
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--text); font: var(--fs-md)/var(--lh) var(--font-ui); -webkit-font-smoothing: antialiased; }
+a { color: var(--accent); text-decoration: none; }
+a:hover { text-decoration: underline; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; border-radius: var(--radius-sm); }
+button { font: inherit; color: inherit; }
+.mono { font-family: var(--font-mono); font-size: 0.95em; }
+.num { font-variant-numeric: tabular-nums; }
+.muted { color: var(--text-muted); }
+.faint { color: var(--text-faint); }
+.sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+h1, h2, h3 { margin: 0; font-weight: 600; }
+h1 { font-size: var(--fs-xl); }
+h2 { font-size: var(--fs-lg); }
+h3 { font-size: var(--fs-md); }
+
+/* ============ App shell ============ */
+.topbar { position: sticky; top: 0; z-index: 10; display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-3) var(--sp-5); background: var(--surface); border-bottom: 1px solid var(--border); }
+.brand { display: flex; align-items: center; gap: var(--sp-3); font-weight: 600; color: var(--text); }
+.brand-mark { width: 18px; height: 18px; border-radius: 4px; background: linear-gradient(135deg, var(--st-run) 0 50%, var(--st-ok) 50% 100%); }
+.crumbs { display: flex; align-items: center; gap: var(--sp-2); min-width: 0; color: var(--text-muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.crumbs a { color: var(--text-muted); }
+.crumbs .sep { color: var(--text-faint); }
+.crumbs [aria-current] { color: var(--text); font-weight: 500; }
+.topbar .spacer { flex: 1; }
+.poll { display: flex; align-items: center; gap: var(--sp-2); color: var(--text-muted); font-size: var(--fs-sm); white-space: nowrap; }
+.poll .pulse { width: 7px; height: 7px; border-radius: 50%; background: var(--st-ok); }
+.poll.is-paused .pulse { background: var(--st-mute); }
+.poll.is-error .pulse { background: var(--st-attn); }
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; min-width: 28px; height: 28px; padding: 0 var(--sp-3); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); cursor: pointer; font-size: var(--fs-sm); color: var(--text-muted); }
+.icon-btn:hover { background: var(--hover); color: var(--text); }
+.attn-count { display: inline-flex; align-items: center; gap: var(--sp-2); padding: 2px var(--sp-3); border-radius: 999px; background: var(--st-attn-tint); color: var(--st-attn); border: 1px solid var(--st-attn-line); font-weight: 600; font-size: var(--fs-sm); white-space: nowrap; }
+.attn-count:hover { text-decoration: none; filter: brightness(0.98); }
+
+.mock-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); padding: var(--sp-2) var(--sp-5); background: var(--sunken); border-bottom: 1px dashed var(--border-strong); font-size: var(--fs-xs); color: var(--text-muted); }
+.mock-bar strong { color: var(--text); font-weight: 600; }
+.mock-bar button { border: 1px solid var(--border); background: var(--surface); border-radius: var(--radius-sm); padding: 1px var(--sp-3); cursor: pointer; font-size: var(--fs-xs); color: var(--text-muted); }
+.mock-bar button[aria-pressed="true"] { background: var(--text); color: var(--surface); border-color: var(--text); }
+
+main { padding: var(--sp-5); max-width: 1480px; margin: 0 auto; }
+.section { margin-bottom: var(--sp-6); }
+.section-head { display: flex; align-items: baseline; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.section-head .count { color: var(--text-faint); font-size: var(--fs-sm); }
+.section-head .spacer { flex: 1; }
+.panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); }
+
+/* ============ Status primitives ============ */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 0 6px; height: 20px; border-radius: var(--radius-sm); font-size: var(--fs-xs); font-weight: 600; letter-spacing: .01em; white-space: nowrap; border: 1px solid transparent; }
+.badge .glyph { font-size: 9px; line-height: 1; }
+.tone-attn  { color: var(--st-attn);  background: var(--st-attn-tint);  border-color: var(--st-attn-line); }
+.tone-warn  { color: var(--st-warn);  background: var(--st-warn-tint);  border-color: var(--st-warn-line); }
+.tone-run   { color: var(--st-run);   background: var(--st-run-tint);   border-color: var(--st-run-line); }
+.tone-ok    { color: var(--st-ok);    background: var(--st-ok-tint);    border-color: var(--st-ok-line); }
+.tone-mute  { color: var(--st-mute);  background: var(--st-mute-tint);  border-color: var(--st-mute-line); }
+.tone-stale { color: var(--st-stale); background: var(--st-stale-tint); border-color: var(--st-stale-line); }
+.chip { display: inline-flex; align-items: center; height: 18px; padding: 0 6px; border-radius: 999px; font-size: var(--fs-xs); color: var(--text-muted); background: var(--sunken); border: 1px solid var(--border); white-space: nowrap; }
+.risk { display: inline-flex; align-items: center; gap: 3px; font-size: var(--fs-xs); font-weight: 600; white-space: nowrap; }
+.risk .bars { display: inline-flex; gap: 1px; align-items: flex-end; }
+.risk .bars i { display: block; width: 3px; background: var(--border-strong); border-radius: 1px; }
+.risk .bars i:nth-child(1) { height: 5px; } .risk .bars i:nth-child(2) { height: 8px; } .risk .bars i:nth-child(3) { height: 11px; }
+.risk.low { color: var(--text-muted); } .risk.low .bars i:nth-child(-n+1) { background: var(--text-muted); }
+.risk.medium { color: var(--st-warn); } .risk.medium .bars i:nth-child(-n+2) { background: var(--st-warn); }
+.risk.high { color: var(--st-attn); } .risk.high .bars i:nth-child(-n+3) { background: var(--st-attn); }
+.model { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); }
+.rev { display: inline-flex; align-items: center; gap: 3px; height: 18px; padding: 0 5px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: var(--fs-xs); background: var(--surface); white-space: nowrap; }
+.rev .v { font-weight: 700; }
+.rev.pass { border-color: var(--st-ok-line); } .rev.pass .v { color: var(--st-ok); }
+.rev.changes { border-color: var(--st-warn-line); } .rev.changes .v { color: var(--st-warn); }
+.rev.running .v { color: var(--st-run); }
+
+/* ============ Attention list ============ */
+.attention { border: 1px solid var(--st-attn-line); border-left: 4px solid var(--st-attn); background: var(--surface); border-radius: var(--radius-lg); overflow: hidden; }
+.attention-head { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); background: var(--st-attn-tint); color: var(--st-attn); font-weight: 600; }
+.attention-head .spacer { flex: 1; }
+.attention-head .hint { font-weight: 400; color: var(--text-muted); font-size: var(--fs-sm); }
+.attn-row { display: grid; grid-template-columns: 150px minmax(0, 1fr) auto; gap: var(--sp-4); align-items: start; padding: var(--sp-3) var(--sp-4); border-top: 1px solid var(--border); color: inherit; }
+.attn-row:hover { background: var(--hover); text-decoration: none; }
+.attn-row .what { min-width: 0; }
+.attn-row .title { font-weight: 600; color: var(--text); }
+.attn-row .why { color: var(--text-muted); margin-top: 2px; }
+.attn-row .ask { margin-top: 4px; color: var(--text); font-size: var(--fs-sm); padding-left: var(--sp-3); border-left: 2px solid var(--border-strong); }
+.attn-row .meta { text-align: right; font-size: var(--fs-sm); color: var(--text-muted); white-space: nowrap; }
+.attn-row .meta .next { display: block; margin-top: 2px; color: var(--accent); }
+.attention.watch { border-color: var(--st-warn-line); border-left-color: var(--st-warn); margin-top: var(--sp-3); }
+.attention.watch .attention-head { background: var(--st-warn-tint); color: var(--st-warn); }
+.attn-row.compact { padding-top: 6px; padding-bottom: 6px; }
+.attn-row.compact .why { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.attention-clear { display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border: 1px solid var(--st-ok-line); background: var(--st-ok-tint); color: var(--st-ok); border-radius: var(--radius-lg); font-weight: 500; }
+
+/* ============ Factories table ============ */
+.table-wrap { overflow-x: auto; }
+table.grid { width: 100%; border-collapse: collapse; font-size: var(--fs-md); }
+.grid th { text-align: left; font-weight: 500; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .04em; color: var(--text-faint); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border); white-space: nowrap; }
+.grid th.r, .grid td.r { text-align: right; }
+.grid td { padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border); vertical-align: top; }
+.grid tbody tr:last-child td { border-bottom: 0; }
+.grid tbody tr { cursor: pointer; }
+.grid tbody tr:hover td { background: var(--hover); }
+.grid tr.is-attn td:first-child { box-shadow: inset 3px 0 0 var(--st-attn); }
+.grid tr.is-stale td:first-child { box-shadow: inset 3px 0 0 var(--st-stale); }
+.grid tr.is-error td:first-child { box-shadow: inset 3px 0 0 var(--st-attn); }
+.fname { font-weight: 600; color: var(--text); }
+.fpath { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); }
+.stage-mini { display: flex; flex-wrap: wrap; gap: 4px; }
+.stage-mini .chip b { color: var(--text); font-weight: 600; margin-left: 3px; }
+.waiting { display: flex; flex-direction: column; gap: 2px; }
+.spark { display: inline-flex; align-items: flex-end; gap: 2px; height: 18px; vertical-align: middle; margin-left: var(--sp-3); }
+.spark i { display: block; width: 4px; background: var(--st-ok); opacity: .75; border-radius: 1px 1px 0 0; }
+.spark i.zero { height: 1px !important; background: var(--border-strong); }
+.err-text { color: var(--st-attn); font-size: var(--fs-sm); }
+.f-cards { display: none; }
+
+/* ============ Factory header / stats ============ */
+.page-head { display: flex; flex-wrap: wrap; align-items: flex-start; gap: var(--sp-4); margin-bottom: var(--sp-5); }
+.page-head .titles { min-width: 0; flex: 1 1 320px; }
+.page-head .sub { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); margin-top: var(--sp-2); color: var(--text-muted); font-size: var(--fs-sm); }
+.stats { display: grid; grid-template-columns: repeat(5, minmax(110px, 1fr)); gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--radius-lg); overflow: hidden; margin-bottom: var(--sp-5); }
+.stat { background: var(--surface); padding: var(--sp-3) var(--sp-4); }
+.stat .label { font-size: var(--fs-xs); color: var(--text-faint); text-transform: uppercase; letter-spacing: .04em; }
+.stat .value { font-size: var(--fs-xl); font-weight: 600; font-variant-numeric: tabular-nums; margin-top: 2px; }
+.stat .value.attn { color: var(--st-attn); }
+.stat .delta { font-size: var(--fs-xs); color: var(--text-muted); }
+
+.banner { display: flex; gap: var(--sp-3); align-items: flex-start; padding: var(--sp-3) var(--sp-4); border-radius: var(--radius-lg); margin-bottom: var(--sp-5); border: 1px solid; }
+.banner .b-title { font-weight: 600; }
+.banner .b-body { color: var(--text); font-size: var(--fs-sm); margin-top: 2px; }
+.banner code { font-family: var(--font-mono); font-size: var(--fs-sm); background: var(--surface); padding: 0 4px; border-radius: var(--radius-sm); border: 1px solid var(--border); color: var(--text); }
+
+/* ============ Board ============ */
+.board-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.seg button { border: 0; background: var(--surface); padding: 3px var(--sp-4); cursor: pointer; font-size: var(--fs-sm); color: var(--text-muted); }
+.seg button + button { border-left: 1px solid var(--border); }
+.seg button[aria-pressed="true"] { background: var(--sunken); color: var(--text); font-weight: 600; }
+.board { display: grid; grid-template-columns: var(--cols); gap: var(--sp-3); overflow-x: auto; padding-bottom: var(--sp-3); }
+.lane { background: var(--sunken); border-radius: var(--radius-lg); padding: var(--sp-3); min-height: 120px; display: flex; flex-direction: column; gap: var(--sp-3); }
+.lane-head { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); padding: 0 2px; }
+.lane-head .n { margin-left: auto; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+.lane-head .kind { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--text-faint); }
+.lane.is-attn { background: var(--st-attn-tint); outline: 1px solid var(--st-attn-line); }
+.lane.is-attn .lane-head { color: var(--st-attn); }
+.lane.is-warn { background: var(--st-warn-tint); outline: 1px solid var(--st-warn-line); }
+.lane.is-warn .lane-head { color: var(--st-warn); }
+.lane.is-empty .lane-head { flex-wrap: wrap; row-gap: 0; }
+.lane.is-empty { background: transparent; border: 1px dashed var(--border); }
+.lane-empty { color: var(--text-faint); font-size: var(--fs-sm); padding: var(--sp-3) 2px; }
+.card { display: block; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--sp-3); color: inherit; }
+.card:hover { border-color: var(--border-strong); text-decoration: none; box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+.card.flag-attn { border-left: 3px solid var(--st-attn); }
+.card.flag-warn { border-left: 3px solid var(--st-warn); }
+.card-top { display: flex; align-items: center; gap: var(--sp-2); font-size: var(--fs-xs); color: var(--text-faint); }
+.card-top .spacer { flex: 1; }
+.card-title { font-weight: 600; margin: 4px 0 6px; color: var(--text); line-height: 1.3; }
+.card-row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; margin-top: 4px; }
+.card-foot { display: flex; align-items: center; white-space: nowrap; gap: var(--sp-3); margin-top: 8px; padding-top: 6px; border-top: 1px solid var(--border); font-size: var(--fs-xs); color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.card-foot .spacer { flex: 1; }
+.card-flag { margin-top: 6px; font-size: var(--fs-xs); font-weight: 600; }
+.card-flag.attn { color: var(--st-attn); } .card-flag.warn { color: var(--st-warn); }
+.rounds { display: inline-flex; gap: 2px; align-items: center; }
+.rounds i { width: 7px; height: 7px; border-radius: 2px; border: 1px solid var(--border-strong); }
+.rounds i.used { background: var(--text-muted); border-color: var(--text-muted); }
+.rounds i.used.last { background: var(--st-attn); border-color: var(--st-attn); }
+.done-list { margin-top: var(--sp-5); }
+.done-list .grid td { padding: 6px var(--sp-4); }
+
+/* ============ Job view ============ */
+.job-layout > *, .tl-item, .filecard { min-width: 0; }
+.job-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: var(--sp-5); align-items: start; }
+.facts { display: grid; grid-template-columns: repeat(6, auto); justify-content: start; gap: var(--sp-2) var(--sp-6); margin-top: var(--sp-3); font-size: var(--fs-sm); }
+.facts dt { color: var(--text-faint); font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .04em; }
+.facts dd { margin: 0; font-variant-numeric: tabular-nums; }
+.links { display: flex; gap: var(--sp-3); flex-wrap: wrap; }
+.btn { display: inline-flex; align-items: center; gap: var(--sp-2); height: 28px; padding: 0 var(--sp-4); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); color: var(--text); font-size: var(--fs-sm); cursor: pointer; white-space: nowrap; }
+.btn:hover { background: var(--hover); text-decoration: none; }
+
+.pipeline { display: flex; gap: 2px; margin: var(--sp-4) 0 var(--sp-5); overflow-x: auto; }
+.pipe { flex: 1 1 0; min-width: 64px; padding: 4px 6px; font-size: var(--fs-xs); text-align: center; background: var(--sunken); color: var(--text-faint); white-space: nowrap; }
+.pipe:first-child { border-radius: var(--radius) 0 0 var(--radius); }
+.pipe:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
+.pipe.done { background: var(--st-ok-tint); color: var(--st-ok); }
+.pipe.current { background: var(--st-run-tint); color: var(--st-run); font-weight: 700; box-shadow: inset 0 -2px 0 var(--st-run); }
+.pipe.current.attn { background: var(--st-attn-tint); color: var(--st-attn); box-shadow: inset 0 -2px 0 var(--st-attn); }
+
+.timeline { list-style: none; margin: 0; padding: 0; }
+.tl-item { position: relative; padding: 0 0 var(--sp-5) 28px; }
+.tl-item::before { content: ""; position: absolute; left: 8px; top: 18px; bottom: 0; width: 2px; background: var(--border); }
+.tl-item:last-child::before { display: none; }
+.tl-dot { position: absolute; left: 1px; top: 3px; width: 16px; height: 16px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; border: 2px solid var(--surface); }
+.tl-dot.ok { background: var(--st-ok); color: var(--surface); }
+.tl-dot.warn { background: var(--st-warn); color: var(--surface); }
+.tl-dot.attn { background: var(--st-attn); color: var(--surface); }
+.tl-dot.run { background: var(--st-run); color: var(--surface); }
+.tl-dot.mute { background: var(--st-mute); color: var(--surface); }
+.tl-head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-3); }
+.tl-head .stage-name { font-weight: 600; }
+.tl-head .spacer { flex: 1; }
+.tl-head .when { font-size: var(--fs-xs); color: var(--text-faint); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.round-sep { margin: 0 0 var(--sp-4) 28px; font-size: var(--fs-xs); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--text-faint); display: flex; align-items: center; gap: var(--sp-3); }
+.round-sep::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+.filecard { margin-top: var(--sp-3); border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+.filecard-head { display: flex; align-items: center; gap: var(--sp-3); padding: 6px var(--sp-4); border-bottom: 1px solid var(--border); font-size: var(--fs-sm); }
+.filecard-head .fn { font-family: var(--font-mono); font-size: var(--fs-sm); color: var(--text); }
+.filecard-head .spacer { flex: 1; }
+.filecard-head button.link { border: 0; background: none; color: var(--accent); cursor: pointer; padding: 0; font-size: var(--fs-sm); }
+.filecard-head button.link:hover { text-decoration: underline; }
+.filecard ul { margin: 0; padding: var(--sp-3) var(--sp-4) var(--sp-3) calc(var(--sp-4) + 14px); }
+.filecard li { margin: 2px 0; }
+.gatelog { margin: 0; padding: var(--sp-3) var(--sp-4); font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.55; background: var(--sunken); border-top: 1px solid var(--border); overflow-x: auto; white-space: pre; color: var(--text); }
+.gatelog .fail { color: var(--st-attn); font-weight: 600; }
+.gatelog .dim { color: var(--text-faint); }
+
+.side { position: sticky; top: 60px; }
+.side .panel { padding: var(--sp-4); margin-bottom: var(--sp-4); }
+.side h3 { margin-bottom: var(--sp-3); }
+table.matrix { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.matrix th, .matrix td { padding: 5px 6px; border-bottom: 1px solid var(--border); text-align: center; }
+.matrix th:first-child, .matrix td:first-child { text-align: left; }
+.matrix thead th { font-weight: 500; font-size: var(--fs-xs); color: var(--text-faint); text-transform: uppercase; letter-spacing: .04em; }
+.matrix tbody tr:last-child td { border-bottom: 0; }
+.verdict { display: inline-block; min-width: 58px; padding: 0 5px; border-radius: var(--radius-sm); font-size: var(--fs-xs); font-weight: 700; border: 1px solid; }
+.verdict-btn { border: 0; background: none; padding: 0; cursor: pointer; }
+.verdict-btn:hover .verdict { text-decoration: underline; }
+.verdict.pass { color: var(--st-ok); background: var(--st-ok-tint); border-color: var(--st-ok-line); }
+.verdict.changes { color: var(--st-warn); background: var(--st-warn-tint); border-color: var(--st-warn-line); }
+.verdict.skip { color: var(--text-faint); background: transparent; border-color: var(--border); font-weight: 500; }
+.verdict.running { color: var(--st-run); background: var(--st-run-tint); border-color: var(--st-run-line); }
+.cost-rows { display: grid; grid-template-columns: 1fr auto auto; gap: 4px var(--sp-4); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.cost-rows .h { font-size: var(--fs-xs); color: var(--text-faint); text-transform: uppercase; letter-spacing: .04em; }
+.cost-rows .total { font-weight: 700; border-top: 1px solid var(--border); padding-top: 4px; }
+.footnote { font-size: var(--fs-xs); color: var(--text-faint); margin-top: var(--sp-3); }
+
+dialog.file { width: min(820px, calc(100vw - 32px)); max-height: calc(100vh - 64px); padding: 0; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); color: var(--text); box-shadow: var(--shadow-pop); }
+dialog.file::backdrop { background: rgba(10,12,16,.45); }
+.dlg-head { flex-wrap: wrap; position: sticky; top: 0; display: flex; align-items: center; gap: var(--sp-3); padding: var(--sp-3) var(--sp-4); border-bottom: 1px solid var(--border); background: var(--surface); }
+.dlg-head .fn { overflow-wrap: anywhere; font-family: var(--font-mono); font-weight: 600; }
+.dlg-head .spacer { flex: 1; }
+.dlg-body { padding: var(--sp-4) var(--sp-5); line-height: 1.6; }
+.dlg-body h2 { font-size: var(--fs-lg); margin: var(--sp-4) 0 var(--sp-2); }
+.dlg-body h2:first-child { margin-top: 0; }
+.dlg-body pre { background: var(--sunken); padding: var(--sp-3); border-radius: var(--radius); overflow-x: auto; font-size: var(--fs-sm); }
+.dlg-body code { font-family: var(--font-mono); font-size: .92em; }
+
+/* ============ States ============ */
+.state-box { text-align: center; padding: var(--sp-7) var(--sp-5); color: var(--text-muted); }
+.state-box h2 { color: var(--text); margin-bottom: var(--sp-2); }
+.state-box code { font-family: var(--font-mono); background: var(--sunken); padding: 1px 6px; border-radius: var(--radius-sm); color: var(--text); }
+.skel { display: block; height: 12px; border-radius: 3px; background: linear-gradient(90deg, var(--sunken), var(--hover), var(--sunken)); background-size: 200% 100%; animation: shimmer 1.4s ease-in-out infinite; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .skel { animation: none; } }
+
+/* ============ Narrow ============ */
+@media (max-width: 1100px) {
+  .job-layout { grid-template-columns: minmax(0, 1fr); }
+  .side { position: static; }
+  .facts { grid-template-columns: repeat(3, auto); }
+}
+@media (max-width: 760px) {
+  .icon-btn, .btn, .seg button { min-height: 32px; }
+  main { padding: var(--sp-4); }
+  .topbar { padding: var(--sp-3) var(--sp-4); gap: var(--sp-3); flex-wrap: wrap; }
+  .topbar .poll .label { display: none; }
+  .crumbs { order: 10; flex-basis: 100%; }
+  .mock-bar { padding: var(--sp-2) var(--sp-4); }
+  .attn-row { grid-template-columns: 1fr; gap: 4px; }
+  .attn-row .meta { text-align: left; }
+  .attn-row.compact .why { white-space: normal; }
+  .f-table { display: none; }
+  .f-cards { display: flex; flex-direction: column; gap: var(--sp-3); }
+  .stats { grid-template-columns: repeat(2, 1fr); }
+  .stats .stat:last-child { grid-column: span 2; }
+  .board { grid-template-columns: 1fr; overflow: visible; }
+  .lane { min-height: 0; }
+  .lane.is-empty { display: none; }
+  .facts { grid-template-columns: repeat(2, auto); }
+  .done-list .hide-narrow { display: none; }
+}
+.f-card { display: block; padding: var(--sp-4); color: inherit; }
+.f-card:hover { text-decoration: none; background: var(--hover); }
+.f-card .row { display: flex; flex-wrap: wrap; gap: var(--sp-2) var(--sp-4); align-items: center; margin-top: 6px; font-size: var(--fs-sm); color: var(--text-muted); }
+.f-card.is-attn { box-shadow: inset 3px 0 0 var(--st-attn); }
+.f-card.is-stale { box-shadow: inset 3px 0 0 var(--st-stale); }
+</style>
+</head>
+<body>
+<header class="topbar" role="banner">
+  <a class="brand" href="#/"><span class="brand-mark" aria-hidden="true"></span>Factories</a>
+  <nav class="crumbs" aria-label="Breadcrumb" id="crumbs"></nav>
+  <span class="spacer"></span>
+  <a class="attn-count" id="attnCount" href="#/" title="Jobs waiting on you across all factories"></a>
+  <span class="poll" id="poll"><span class="pulse" aria-hidden="true"></span><span class="label">Updated</span> <span class="num" id="pollAge">4s ago</span></span>
+  <button class="icon-btn" id="themeBtn" type="button" aria-label="Theme: system. Click to change">◐ <span id="themeLabel">System</span></button>
+</header>
+<div class="mock-bar" role="region" aria-label="Mockup controls (not part of the product)">
+  <strong>Mockup only:</strong> preview data state
+  <span id="stateBtns"></span>
+  <span class="faint">· Views: <a href="#/">All factories</a> · <a href="#/f/tidepool">tidepool</a> · <a href="#/f/tidepool/j/local-dash-cooldown">job local-dash-cooldown</a> · <a href="#/f/ledgerline/j/gh-149">job gh-149 (gate fail)</a> · <a href="#/f/infra-scripts">stopped factory</a></span>
+</div>
+<main id="app" tabindex="-1"></main>
+
+<dialog class="file" id="fileDlg" aria-labelledby="dlgTitle">
+  <div class="dlg-head"><span class="fn" id="dlgTitle"></span><span class="faint" id="dlgMeta"></span><span class="spacer"></span><button class="btn" type="button" id="dlgCopy">Copy path</button><button class="btn" type="button" id="dlgClose" aria-label="Close file">Close ✕</button></div>
+  <div class="dlg-body" id="dlgBody"></div>
+</dialog>
+
+<script>
+/* ======================================================================
+   Sample data. Shapes follow the ASSUMED state contract in DESIGN.md §9.
+   "now" is fixed so relative times are stable in the mockup.
+   ====================================================================== */
+const NOW = Date.parse("2026-11-27T14:30:00Z");
+const min = 60e3, hr = 60*min, day = 24*hr;
+const t = (ago) => NOW - ago;
+
+const STAGES = ["intake","needs-info","spec","build","gate","review","approve","merging","needs-human","merged","rejected"];
+const ACTIVE = ["intake","spec","build","gate","review","approve","merging"];
+const FLOW = ["intake","spec","build","gate","review","approve","merging","merged"];
+
+const factories = [
+  { id:"ledgerline", name:"ledgerline", path:"~/dev/ledgerline", backlog:{kind:"github", label:"acme/ledgerline", url:"#"}, merge:"pr",
+    run:{state:"running", heartbeat:t(9e3), concurrency:4, startedAt:t(3*hr+12*min)},
+    week:{merged:18, rejected:2, spend:41.20, spark:[2,3,1,4,3,2,3]}, lastActivity:t(40e3) },
+  { id:"tidepool", name:"tidepool", kind:"game", path:"~/games/tidepool", backlog:{kind:"local", label:"factory/backlog/ (14 ready)"}, merge:"local",
+    run:{state:"running", heartbeat:t(4e3), concurrency:3, startedAt:t(5*hr)},
+    week:{merged:9, rejected:1, spend:63.75, spark:[1,0,2,2,1,3,0]}, lastActivity:t(15e3) },
+  { id:"factory", name:"factory", path:"~/dev2/factory", backlog:{kind:"local", label:"factory/backlog/ (0 ready)"}, merge:"local",
+    run:{state:"idle", heartbeat:t(2*hr+5*min)},
+    week:{merged:4, rejected:0, spend:7.10, spark:[0,1,0,2,0,1,0]}, lastActivity:t(2*hr+5*min) },
+  { id:"infra-scripts", name:"infra-scripts", path:"~/dev/infra-scripts", backlog:{kind:"github", label:"acme/infra-scripts", url:"#"}, merge:"pr",
+    run:{state:"stopped", heartbeat:t(3*day+2*hr)},
+    week:{merged:0, rejected:0, spend:0, spark:[0,0,0,0,0,0,0]}, lastActivity:t(3*day+2*hr) },
+  { id:"docs-site", name:"docs-site", path:"~/dev/docs-site", backlog:{kind:"github", label:"acme/docs-site", url:"#"}, merge:"pr",
+    run:{state:"error"}, error:"Registry path ~/dev/docs-site not found. Moved or deleted? Edit ~/.claude/factory/registry.json or re-run onboarding there.",
+    week:null, lastActivity:null },
+];
+
+const R = (name, model) => ({name, model});
+const jobs = [
+  // ---------------- ledgerline ----------------
+  { id:"gh-142", f:"ledgerline", title:"Archive closed invoices older than 7 years", src:"#142", stage:"needs-human", risk:"high", surfaces:["security"],
+    reviewers:[R("code-reviewer","sonnet"),R("security-reviewer","opus")], round:2, maxRounds:3, created:t(26*hr), entered:t(3*hr+20*min), cost:9.84, pr:{n:388},
+    attention:{kind:"escalated", why:"Approver escalated", ask:"Migration drops invoices.legacy_ref. Nothing in the repo reads it, but a nightly export in another repo might. Safe to drop, or keep it nullable?"} },
+  { id:"gh-151", f:"ledgerline", title:"Show VAT breakdown on invoice PDF", src:"#151", stage:"review", risk:"medium", surfaces:["ui"],
+    reviewers:[R("code-reviewer","sonnet"),R("ux-reviewer","sonnet"),R("ui-reviewer","haiku")], round:2, maxRounds:3, created:t(5*hr), entered:t(6*min), cost:4.12, pr:{n:391},
+    live:{"code-reviewer":"running", "ux-reviewer":"pass", "ui-reviewer":"running"} },
+  { id:"gh-153", f:"ledgerline", title:"Rate-limit password reset endpoint", src:"#153", stage:"build", risk:"medium", surfaces:["security"],
+    reviewers:[R("code-reviewer","sonnet"),R("security-reviewer","opus")], round:1, maxRounds:3, created:t(70*min), entered:t(22*min), cost:1.96, pr:null },
+  { id:"gh-149", f:"ledgerline", title:"Fix rounding in multi-currency totals", src:"#149", stage:"build", risk:"low", surfaces:[],
+    reviewers:[R("code-reviewer","haiku")], round:3, maxRounds:3, created:t(4*hr), entered:t(3*min), cost:3.37, pr:{n:389},
+    gateFails:2, attention:{kind:"gate", why:"Gate failed 2× in a row", ask:"Round 3 of 3 is building. If the gate fails again the job goes to needs-human."} },
+  { id:"gh-155", f:"ledgerline", title:"Add CSV import for bank statements", src:"#155", stage:"intake", risk:null, surfaces:[], reviewers:[], round:0, maxRounds:3, created:t(2*min), entered:t(2*min), cost:0.21, pr:null },
+  { id:"gh-140", f:"ledgerline", title:"Paginate customer list API", src:"#140", stage:"merged", risk:"low", surfaces:[], reviewers:[R("code-reviewer","haiku")], round:1, maxRounds:3, created:t(30*hr), entered:t(20*hr), cost:1.42, pr:{n:384} },
+  { id:"gh-138", f:"ledgerline", title:"Dark mode for settings page", src:"#138", stage:"merged", risk:"medium", surfaces:["ui"], reviewers:[R("code-reviewer","sonnet"),R("ux-reviewer","sonnet"),R("ui-reviewer","haiku")], round:2, maxRounds:3, created:t(2*day), entered:t(28*hr), cost:5.90, pr:{n:381} },
+  { id:"gh-136", f:"ledgerline", title:"Rewrite billing engine in Rust", src:"#136", stage:"rejected", risk:null, surfaces:[], reviewers:[], round:0, maxRounds:3, created:t(3*day), entered:t(3*day-5*min), cost:0.34, pr:null, rejectWhy:"Too large for one PR; intake asked for a split into tracked issues." },
+
+  // ---------------- tidepool (game) ----------------
+  { id:"local-dash-cooldown", f:"tidepool", title:"Dash ability cooldown feels sluggish", src:"factory/backlog/dash-cooldown.md", stage:"needs-human", risk:"medium", surfaces:["gameplay","ui"],
+    reviewers:[R("code-reviewer","sonnet"),R("ux-reviewer","sonnet"),R("ui-reviewer","haiku"),R("gameplay-reviewer","sonnet")], round:3, maxRounds:3, created:t(4*hr+20*min), entered:t(47*min), cost:18.62, pr:null, branch:"factory/local-dash-cooldown",
+    attention:{kind:"max-rounds", why:"Max rounds reached (3/3)", ask:"gameplay-reviewer asked for changes in both reviewed rounds (round 2 failed the gate). Keep 0.35 s and lose the 3-1 wall-dash route, or go to 0.45 s?"} },
+  { id:"local-save-migration", f:"tidepool", title:"Save slots survive game updates", src:"factory/backlog/save-migration.md", stage:"gate", risk:"high", surfaces:[],
+    reviewers:[R("code-reviewer","sonnet")], round:3, maxRounds:4, created:t(6*hr), entered:t(1*min), cost:11.05, pr:null, branch:"factory/local-save-migration",
+    gateFails:3, attention:{kind:"gate", why:"Gate failed 3× in a row", ask:"tests/save_migration.rs::v3_to_v4 times out every round. Gate is running again now (round 3 of 4)."} },
+  { id:"local-pause-menu", f:"tidepool", title:"Add pause menu with resume / settings / quit", src:"factory/backlog/pause-menu.md", stage:"review", risk:"medium", surfaces:["ui","gameplay"],
+    reviewers:[R("code-reviewer","sonnet"),R("ux-reviewer","sonnet"),R("ui-reviewer","haiku"),R("gameplay-reviewer","sonnet")], round:1, maxRounds:3, created:t(2*hr), entered:t(11*min), cost:6.48, pr:null,
+    live:{"code-reviewer":"pass", "ux-reviewer":"running", "ui-reviewer":"pass", "gameplay-reviewer":"running"} },
+  { id:"local-coyote-time", f:"tidepool", title:"Coyote time for ledge jumps", src:"factory/backlog/coyote-time.md", stage:"spec", risk:"low", surfaces:["gameplay"],
+    reviewers:[R("code-reviewer","haiku"),R("gameplay-reviewer","sonnet")], round:0, maxRounds:3, created:t(25*min), entered:t(4*min), cost:0.88, pr:null },
+  { id:"local-enemy-spawns", f:"tidepool", title:"Better enemy spawns", src:"factory/backlog/enemy-spawns.md", stage:"needs-info", risk:null, surfaces:[], reviewers:[], round:0, maxRounds:3, created:t(30*hr), entered:t(29*hr), cost:0.19, pr:null,
+    attention:{kind:"needs-info", why:"Waiting on author", ask:"Intake asked: which levels, and is \"better\" fewer spawns, smarter placement, or more variety?"} },
+  { id:"local-screen-shake", f:"tidepool", title:"Screen shake on heavy landing", src:"factory/backlog/screen-shake.md", stage:"merged", risk:"low", surfaces:["gameplay"], reviewers:[R("code-reviewer","haiku"),R("gameplay-reviewer","sonnet")], round:2, maxRounds:3, created:t(30*hr), entered:t(22*hr), cost:4.40, pr:null },
+  { id:"local-rumble", f:"tidepool", title:"Controller rumble support", src:"factory/backlog/rumble.md", stage:"merged", risk:"medium", surfaces:["gameplay"], reviewers:[R("code-reviewer","sonnet"),R("gameplay-reviewer","sonnet")], round:1, maxRounds:3, created:t(2*day), entered:t(40*hr), cost:5.15, pr:null },
+
+  // ---------------- infra-scripts (stopped) ----------------
+  { id:"gh-61", f:"infra-scripts", title:"Rotate staging DB credentials monthly", src:"#61", stage:"needs-info", risk:null, surfaces:[], reviewers:[], round:0, maxRounds:3, created:t(4*day), entered:t(3*day+3*hr), cost:0.24, pr:null,
+    attention:{kind:"needs-info", why:"Waiting on author", ask:"Intake asked: which secret store holds the staging credentials today?"} },
+  { id:"gh-64", f:"infra-scripts", title:"Terraform fmt check in CI", src:"#64", stage:"build", risk:"low", surfaces:[], reviewers:[R("code-reviewer","haiku")], round:1, maxRounds:3, created:t(3*day+4*hr), entered:t(3*day+2*hr), cost:0.92, pr:null },
+];
+
+const fById = Object.fromEntries(factories.map(f => [f.id, f]));
+const jobsOf = (fid) => jobs.filter(j => j.f === fid);
+
+/* --------- Rich detail for local-dash-cooldown (job view showcase) --------- */
+const detail = {
+  "local-dash-cooldown": {
+    timeline: [
+      { stage:"intake", agent:"intake", model:"fable", dur:3*min, file:"intake.md", tone:"ok", verdict:"ACCEPT (rescoped)",
+        summary:["Accepted; rescoped from \"dash feels bad\" to the cooldown value and its HUD indicator.","Risk medium: changes player movement timings used by every level.","Surfaces: gameplay, ui (cooldown ring on HUD).","Out of scope: dash distance and i-frames."] },
+      { stage:"spec", agent:"spec-writer", model:"opus", dur:14*min, file:"spec.md", tone:"ok",
+        summary:["Cooldown 0.6 s → 0.35 s, exposed as DASH_COOLDOWN in player/tuning.ron.","HUD ring fills over the cooldown; hidden when ready.","Acceptance: dash-chain playtest script passes on levels 1-1 to 4-3.","Unit test for cooldown reset on respawn."] },
+      { round:1 },
+      { stage:"build", agent:"builder", model:"opus", dur:38*min, file:"build-1.md", tone:"ok",
+        summary:["Tuning value moved to player/tuning.ron; Dash system reads it.","HUD ring added in ui/hud/dash_ring.rs.","3 new tests; playtest script updated."] },
+      { stage:"gate", agent:"gate", model:"script", dur:4*min, file:"gate-1.md", tone:"ok", verdict:"PASS", summary:["checks.sh passed: fmt, clippy, 214 tests, wasm build.","No protected paths touched."] },
+      { stage:"review", agent:"4 reviewers", model:"", dur:19*min, tone:"warn", verdict:"CHANGES (1 of 4)", reviews:{"code-reviewer":"pass","ux-reviewer":"pass","ui-reviewer":"pass","gameplay-reviewer":"changes"},
+        file:"review-1-gameplay-reviewer.md",
+        summary:["At 0.35 s the player can chain dash → wall-jump → dash and skip the 4-2 gap puzzle.","Suggests gating the second dash on ground contact, not only the timer.","Other reviewers: PASS (open their files from the matrix)."] },
+      { round:2 },
+      { stage:"build", agent:"builder", model:"opus", dur:31*min, file:"build-2.md", tone:"ok",
+        summary:["Second dash now needs ground or wall contact since the last dash.","Added test dash_requires_contact_after_chain.","Also edited the level 4-2 collision mask (not asked for)."] },
+      { stage:"gate", agent:"gate", model:"script", dur:3*min, file:"gate-2.md", log:"gate-2.log", tone:"attn", verdict:"FAIL",
+        summary:["tests/levels.rs::level_4_2_collision_unchanged failed.","Log sent to the builder; no reviewers spawned."], gatelog:true },
+      { round:3 },
+      { stage:"build", agent:"builder", model:"opus", dur:26*min, file:"build-3.md", tone:"ok",
+        summary:["Reverted the collision mask change.","Kept 0.35 s per spec; wall contact no longer resets the dash.","Spec says 0.35 s, reviewer asked for stricter contact: conflict noted."] },
+      { stage:"gate", agent:"gate", model:"script", dur:4*min, file:"gate-3.md", tone:"ok", verdict:"PASS", summary:["checks.sh passed: 217 tests."] },
+      { stage:"review", agent:"4 reviewers", model:"", dur:18*min, tone:"warn", verdict:"CHANGES (1 of 4)", reviews:{"code-reviewer":"pass","ux-reviewer":"pass","ui-reviewer":"pass","gameplay-reviewer":"changes"},
+        file:"review-3-gameplay-reviewer.md",
+        summary:["Removing the wall reset makes 3-1's intended wall-dash route impossible.","Recommends 0.45 s with the wall reset kept, instead of extra rules.","This is a design call: speed vs. the 4-2 puzzle vs. the 3-1 route."] },
+      { stage:"needs-human", agent:"job", model:"script", tone:"attn", verdict:"max_rounds reached", file:null, source:"job.json · note",
+        summary:["max_rounds (3) reached; gameplay-reviewer asked for changes in both reviewed rounds.","Decide: keep 0.35 s without the wall reset (3-1 route lost), or 0.45 s with it?","/factory feedback local-dash-cooldown \"…\" runs round 4; /factory reject ends the job."] },
+    ],
+    matrix: { reviewers:["code-reviewer","ux-reviewer","ui-reviewer","gameplay-reviewer"], rounds:[
+      {"code-reviewer":"pass","ux-reviewer":"pass","ui-reviewer":"pass","gameplay-reviewer":"changes"},
+      {"code-reviewer":"skip","ux-reviewer":"skip","ui-reviewer":"skip","gameplay-reviewer":"skip"},
+      {"code-reviewer":"pass","ux-reviewer":"pass","ui-reviewer":"pass","gameplay-reviewer":"changes"} ] },
+    note: "Round 2: gate failed, so no reviewer ran.",
+    costs: [ ["intake","fable",0.62], ["spec-writer","opus",1.48], ["builder","opus",11.91], ["code-reviewer","sonnet",1.40], ["ux-reviewer","sonnet",1.10], ["ui-reviewer","haiku",0.21], ["gameplay-reviewer","sonnet",1.90] ],
+  },
+  "gh-149": {
+    timeline: [
+      { stage:"intake", agent:"intake", model:"fable", at:t(4*hr), dur:2*min, file:"intake.md", tone:"ok", verdict:"ACCEPT", summary:["Accepted as written.","Risk low: pure function in money/convert.ts.","No surfaces."] },
+      { stage:"spec", agent:"spec-writer", model:"opus", at:t(4*hr-3*min), dur:9*min, file:"spec.md", tone:"ok", summary:["Round half-even at the final sum, not per line.","Property test over 3 currencies."] },
+      { round:1 },
+      { stage:"build", agent:"builder", model:"opus", at:t(3*hr+40*min), dur:24*min, file:"build-1.md", tone:"ok", summary:["Switched to bigint minor units.","Added fast-check property test."] },
+      { stage:"gate", agent:"gate", model:"script", at:t(3*hr+14*min), dur:6*min, file:"gate-1.md", log:"gate-1.log", tone:"attn", verdict:"FAIL", summary:["typecheck: 4 errors in reports/summary.ts (number vs bigint)."], gatelog:true },
+      { round:2 },
+      { stage:"build", agent:"builder", model:"opus", at:t(3*hr+5*min), dur:41*min, file:"build-2.md", tone:"ok", summary:["Updated reports/summary.ts to bigint.","Property test now seeds 1000 runs."] },
+      { stage:"gate", agent:"gate", model:"script", at:t(2*hr+20*min), dur:7*min, file:"gate-2.md", log:"gate-2.log", tone:"attn", verdict:"FAIL", summary:["Property test failed: JPY (0 decimals) rounds 0.5 up.","Builder got the log; no reviewers spawned."], gatelog:true },
+      { round:3 },
+      { stage:"build", agent:"builder", model:"opus", at:t(3*min), tone:"run", verdict:"running", summary:[] , file:null},
+    ],
+    matrix: { reviewers:["code-reviewer"], rounds:[ {"code-reviewer":"skip"}, {"code-reviewer":"skip"}, {} ] },
+    note: "Rounds 1–2: gate failed, so no reviewer ran. Round 3 is building.",
+    costs: [ ["intake","fable",0.31], ["spec-writer","opus",0.74], ["builder","opus",2.32] ],
+  }
+};
+
+/* ======================================================================
+   Derived values (pure functions; see DESIGN.md §8.7, data/derive.ts)
+   ====================================================================== */
+function ago(ms) {
+  const d = NOW - ms;
+  if (d < min) return Math.round(d/1e3) + "s ago";
+  if (d < hr) return Math.round(d/min) + "m ago";
+  if (d < day) return Math.floor(d/hr) + "h " + Math.round((d%hr)/min) + "m ago";
+  return Math.floor(d/day) + "d " + Math.floor((d%day)/hr) + "h ago";
+}
+function dur(ms) {
+  if (ms == null) return "—";
+  if (ms < min) return Math.round(ms/1e3) + "s";
+  if (ms < hr) return Math.round(ms/min) + "m";
+  if (ms < day) return Math.floor(ms/hr) + "h " + String(Math.round((ms%hr)/min)).padStart(2,"0") + "m";
+  return Math.floor(ms/day) + "d " + Math.floor((ms%day)/hr) + "h";
+}
+const usd = (n) => "$" + n.toFixed(2);
+const esc = (s) => String(s).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+const ATTN_RANK = { "error":0, "max-rounds":1, "escalated":2, "gate":3, "needs-info":4 };
+function attentionItems(fid) {
+  const items = jobs.filter(j => j.attention && (!fid || j.f === fid))
+    .map(j => ({ job:j, f:fById[j.f], kind:j.attention.kind, since:j.entered }));
+  if (!fid) factories.filter(f => f.run.state === "error").forEach(f => items.push({ f, kind:"error", since:null }));
+  return items.sort((a,b) => ATTN_RANK[a.kind]-ATTN_RANK[b.kind] || a.since-b.since);
+}
+const KIND_BADGE = {
+  "max-rounds": ["tone-attn","▲","Max rounds"],
+  "escalated":  ["tone-attn","▲","Needs human"],
+  "gate":       ["tone-warn","◆","Gate failing"],
+  "needs-info": ["tone-warn","?","Needs info"],
+  "error":      ["tone-attn","✕","Unreadable"],
+};
+const NEXT = {
+  "max-rounds": (j) => "Decide · /factory feedback " + j.id,
+  "escalated":  (j) => j.pr ? "Review PR #" + j.pr.n : "Decide",
+  "gate":       (j) => "Watch round " + j.round + "/" + j.maxRounds,
+  "needs-info": (j) => j.src.startsWith("#") ? "Author replies on issue " + j.src : "Answer in " + j.src.split("/").pop(),
+};
+function stageTone(s) {
+  return { "needs-human":"tone-attn", "needs-info":"tone-warn", "merged":"tone-ok", "rejected":"tone-mute" }[s] || "tone-run";
+}
+const STAGE_GLYPH = { "needs-human":"▲", "needs-info":"?", "merged":"✓", "rejected":"✕" };
+const stageBadge = (s) => `<span class="badge ${stageTone(s)}"><span class="glyph" aria-hidden="true">${STAGE_GLYPH[s] || "●"}</span>${s}</span>`;
+const RUN_BADGE = {
+  running: ["tone-run","●","Running"], idle: ["tone-mute","○","Idle"], stopped: ["tone-stale","■","Stopped"], error: ["tone-attn","✕","Error"],
+};
+const runBadge = (f) => { const [c,g,l] = RUN_BADGE[f.run.state]; return `<span class="badge ${c}"><span class="glyph" aria-hidden="true">${g}</span>${l}</span>`; };
+const riskEl = (r) => r ? `<span class="risk ${r}" title="Risk ${r}"><span class="bars" aria-hidden="true"><i></i><i></i><i></i></span>${r}</span>` : `<span class="faint" style="font-size:var(--fs-xs)">unrated</span>`;
+const short = (n) => n.replace(/-reviewer$/, "");
+const revEl = (r, state) => `<span class="rev ${state||""}" title="${esc(r.name)} reviewer on ${r.model}${state ? ": " + state : ""}">${state === "pass" ? '<span class="v">✓</span>' : state === "changes" ? '<span class="v">!</span>' : state === "running" ? '<span class="v">●</span>' : ""}${esc(short(r.name))} <span class="model">${r.model}</span></span>`;
+const roundsEl = (j) => j.round ? `<span class="rounds" aria-hidden="true">${Array.from({length:j.maxRounds},(_,i)=>`<i class="${i<j.round?"used":""}${i===j.round-1 && j.round===j.maxRounds?" last":""}"></i>`).join("")}</span> <span title="Round ${j.round} of ${j.maxRounds}"><span class="sr-only">Round </span>R${j.round}/${j.maxRounds}</span>` : `<span>—</span>`;
+const srcLink = (j) => { const f = fById[j.f]; return f.backlog.kind === "github" ? `<a href="#" onclick="return false">${f.backlog.label}${j.src}</a>` : `<a href="#" onclick="return false" class="mono">${esc(j.src)}</a>`; };
+
+/* ======================================================================
+   Views
+   ====================================================================== */
+let demoState = "live";
+let boardMode = "board";
+
+const YOUR_MOVE = new Set(["error","max-rounds","escalated"]);
+function attnRow(it, fid, compact) {
+  if (it.kind === "error") {
+    const [c,g,l] = KIND_BADGE.error;
+    return `<a class="attn-row" href="#/f/${it.f.id}"><div><span class="badge ${c}"><span class="glyph" aria-hidden="true">${g}</span>${l}</span></div>
+      <div class="what"><div class="title">${it.f.name}</div><div class="why">${esc(it.f.error)}</div></div>
+      <div class="meta">factory<span class="next">Fix registry entry →</span></div></a>`;
+  }
+  const j = it.job, [c,g,l] = KIND_BADGE[it.kind];
+  return `<a class="attn-row${compact ? " compact" : ""}" href="#/f/${j.f}/j/${j.id}">
+    <div><span class="badge ${c}"><span class="glyph" aria-hidden="true">${g}</span>${l}</span></div>
+    <div class="what"><div class="title">${fid ? "" : `<span class="muted">${j.f} ·</span> `}<span class="mono faint">${j.id}</span> ${esc(j.title)}</div>
+      ${compact ? `<div class="why">${esc(j.attention.why)} · ${esc(j.attention.ask)}</div>`
+        : `<div class="why">${esc(j.attention.why)}${j.reviewers.length ? " · " + j.reviewers.map(r=>short(r.name)).join(", ") : ""}</div><div class="ask">${esc(j.attention.ask)}</div>`}</div>
+    <div class="meta num">${ago(it.since).replace(" ago","")} ${compact ? "" : "waiting "}· ${usd(j.cost)}<span class="next">${NEXT[it.kind](j)} →</span></div></a>`;
+}
+function viewAttention(fid) {
+  const items = attentionItems(fid);
+  const mine = items.filter(i => YOUR_MOVE.has(i.kind)), watch = items.filter(i => !YOUR_MOVE.has(i.kind));
+  let html = "";
+  html += mine.length
+    ? `<section class="attention" aria-labelledby="attnH${fid||""}">
+        <div class="attention-head"><span aria-hidden="true">▲</span><h2 id="attnH${fid||""}" style="font-size:inherit">Your move</h2><span class="num">${mine.length}</span><span class="spacer"></span><span class="hint">Blocked until you decide · oldest first</span></div>
+        ${mine.map(it => attnRow(it, fid, false)).join("")}</section>`
+    : `<div class="attention-clear" role="status"><span aria-hidden="true">✓</span> Nothing is blocked on you${fid ? " in this factory" : ""}.</div>`;
+  if (watch.length) html += `<section class="attention watch" aria-labelledby="watchH${fid||""}">
+        <div class="attention-head"><span aria-hidden="true">◆</span><h2 id="watchH${fid||""}" style="font-size:inherit">Watch</h2><span class="num">${watch.length}</span><span class="spacer"></span><span class="hint">Stuck or waiting on someone else · may become your move</span></div>
+        ${watch.map(it => attnRow(it, fid, true)).join("")}</section>`;
+  return html;
+}
+
+function stageCounts(fid) {
+  const c = {}; jobsOf(fid).forEach(j => { if (ACTIVE.includes(j.stage)) c[j.stage] = (c[j.stage]||0)+1; });
+  return ACTIVE.filter(s => c[s]).map(s => `<span class="chip">${s}<b>${c[s]}</b></span>`).join("") || `<span class="faint">nothing running</span>`;
+}
+function waitingCell(fid) {
+  const a = attentionItems(fid);
+  if (!a.length) return `<span class="faint">—</span>`;
+  const by = {}; a.forEach(i => by[i.kind] = (by[i.kind]||0)+1);
+  return `<div class="waiting">${Object.entries(by).map(([k,n]) => { const [c,g,l] = KIND_BADGE[k]; return `<span><span class="badge ${c}"><span class="glyph" aria-hidden="true">${g}</span>${n} ${l.toLowerCase()}</span></span>`; }).join("")}</div>`;
+}
+const sparkEl = (arr) => { const m = Math.max(1,...arr); return `<span class="spark" aria-hidden="true">${arr.map(v => `<i class="${v?"":"zero"}" style="height:${Math.max(2, v/m*18)}px"></i>`).join("")}</span>`; };
+function rowClass(f) { if (f.run.state === "error") return "is-error"; if (attentionItems(f.id).length) return "is-attn"; if (f.run.state === "stopped") return "is-stale"; return ""; }
+function runCell(f) {
+  if (f.run.state === "running") return `${runBadge(f)}<div class="faint" style="font-size:var(--fs-xs);margin-top:3px">${jobsOf(f.id).filter(j=>ACTIVE.includes(j.stage)).length}/${f.run.concurrency} slots · last write ${ago(f.run.heartbeat)}</div>`;
+  if (f.run.state === "stopped") return `${runBadge(f)}<div class="faint" style="font-size:var(--fs-xs);margin-top:3px">since ${ago(f.run.heartbeat)}</div>`;
+  if (f.run.state === "idle") return `${runBadge(f)}<div class="faint" style="font-size:var(--fs-xs);margin-top:3px">queue empty</div>`;
+  return runBadge(f);
+}
+
+function viewOverview() {
+  const sorted = [...factories].sort((a,b) => {
+    const rank = (f) => f.run.state === "error" ? 0 : attentionItems(f.id).length ? 1 : f.run.state === "stopped" ? 2 : f.run.state === "running" ? 3 : 4;
+    return rank(a) - rank(b) || (b.lastActivity||0) - (a.lastActivity||0);
+  });
+  const totals = factories.reduce((acc,f) => { if (f.week) { acc.m += f.week.merged; acc.s += f.week.spend; } return acc; }, {m:0,s:0});
+  const running = factories.filter(f => f.run.state === "running").length;
+  const activeJobs = jobs.filter(j => ACTIVE.includes(j.stage) && fById[j.f].run.state === "running").length;
+  const rows = sorted.map(f => {
+    if (f.run.state === "error") return `<tr class="${rowClass(f)}" onclick="location.hash='#/f/${f.id}'"><td><a class="fname" href="#/f/${f.id}">${f.name}</a><div class="fpath">${f.path}</div></td><td colspan="2"><div class="err-text">${esc(f.error)}</div></td><td>${runBadge(f)}</td><td class="r faint">—</td><td class="r faint">—</td><td class="r faint">—</td></tr>`;
+    return `<tr class="${rowClass(f)}" onclick="location.hash='#/f/${f.id}'">
+      <td><a class="fname" href="#/f/${f.id}">${f.name}</a>${f.kind === "game" ? ` <span class="chip">game</span>` : ""}<div class="fpath">${f.path}</div></td>
+      <td><span class="chip">${f.backlog.kind === "github" ? "GitHub" : "local"}</span> <span class="muted" style="font-size:var(--fs-sm)">${esc(f.backlog.label)}</span><div class="faint" style="font-size:var(--fs-xs);margin-top:2px">merge: ${f.merge}</div></td>
+      <td>${waitingCell(f.id)}</td>
+      <td>${runCell(f)}<div class="stage-mini" style="margin-top:4px">${f.run.state === "running" ? stageCounts(f.id) : ""}</div></td>
+      <td class="r num">${f.week.merged}${sparkEl(f.week.spark)}<div class="faint" style="font-size:var(--fs-xs)">${f.week.rejected} rejected</div></td>
+      <td class="r num">${usd(f.week.spend)}</td>
+      <td class="r num muted">${ago(f.lastActivity)}</td></tr>`;
+  }).join("");
+  const cards = sorted.map(f => `<a class="f-card ${rowClass(f) === "is-error" ? "is-attn" : rowClass(f)}" href="#/f/${f.id}" style="border-bottom:1px solid var(--border)">
+      <div style="display:flex;gap:8px;align-items:center"><span class="fname">${f.name}</span>${runBadge(f)}<span style="flex:1"></span><span class="faint num" style="font-size:var(--fs-xs)">${f.lastActivity ? ago(f.lastActivity) : ""}</span></div>
+      ${f.run.state === "error" ? `<div class="err-text" style="margin-top:6px">${esc(f.error)}</div>` : `
+      <div class="row">${waitingCell(f.id).replace('class="waiting"','class="waiting" style="flex-direction:row;flex-wrap:wrap;gap:4px"')}</div>
+      <div class="row"><span>${f.backlog.kind === "github" ? "GitHub" : "local"}</span><span class="num">${f.week.merged} merged / 7d</span><span class="num">${usd(f.week.spend)}</span></div>
+      ${f.run.state === "running" ? `<div class="row stage-mini">${stageCounts(f.id)}</div>` : ""}`}
+    </a>`).join("");
+  return `
+    <div class="page-head"><div class="titles"><h1>All factories</h1>
+      <div class="sub"><span>${factories.length} registered</span><span>${running} running · ${activeJobs} jobs in flight</span><span class="num">7d: ${totals.m} merged · ${usd(totals.s)} API-equivalent</span><span class="faint mono">~/.claude/factory/registry.json</span></div></div></div>
+    <div class="section">${viewAttention(null)}</div>
+    <section class="section" aria-labelledby="fH">
+      <div class="section-head"><h2 id="fH">Factories</h2><span class="count">sorted: needs attention, then recent</span></div>
+      <div class="panel f-table"><div class="table-wrap"><table class="grid">
+        <caption class="sr-only">Registered factories</caption>
+        <thead><tr><th scope="col">Factory</th><th scope="col">Backlog</th><th scope="col">Waiting on you</th><th scope="col">Now</th><th scope="col" class="r">Merged 7d</th><th scope="col" class="r">Spend 7d</th><th scope="col" class="r">Last activity</th></tr></thead>
+        <tbody>${rows}</tbody></table></div></div>
+      <div class="panel f-cards">${cards}</div>
+    </section>`;
+}
+
+function jobCard(j) {
+  const flag = j.attention ? (j.attention.kind === "gate" || j.attention.kind === "needs-info" ? "warn" : "attn") : "";
+  const live = j.live || {};
+  return `<a class="card ${flag ? "flag-" + flag : ""}" href="#/f/${j.f}/j/${j.id}">
+    <div class="card-top"><span class="mono">${j.id}</span><span>·</span><span>${j.src.startsWith("#") ? j.src : "backlog"}</span><span class="spacer"></span>${riskEl(j.risk)}</div>
+    <div class="card-title">${esc(j.title)}</div>
+    ${j.surfaces.length ? `<div class="card-row">${j.surfaces.map(s => `<span class="chip">${s}</span>`).join("")}</div>` : ""}
+    ${j.reviewers.length ? `<div class="card-row">${j.reviewers.map(r => revEl(r, live[r.name])).join("")}</div>` : ""}
+    ${flag ? `<div class="card-flag ${flag}">${flag === "attn" ? "▲" : "◆"} ${esc(j.attention.why)}</div>` : ""}
+    <div class="card-foot">${roundsEl(j)}<span class="spacer"></span><span title="${dur(NOW - j.entered)} in ${j.stage}">⏱ ${dur(NOW - j.created)}</span><span>${usd(j.cost)}</span></div>
+  </a>`;
+}
+
+function viewFactory(fid) {
+  const f = fById[fid];
+  if (!f) return viewNotFound();
+  if (f.run.state === "error") return `<div class="page-head"><div class="titles"><h1>${f.name}</h1><div class="sub"><span class="mono">${f.path}</span></div></div></div>
+    <div class="panel state-box"><h2>Can't read this factory</h2><p>${esc(f.error)}</p><p class="faint">Retrying every 10 s. Other factories are unaffected.</p></div>`;
+  const js = jobsOf(fid);
+  const att = attentionItems(fid).length, mine = attentionItems(fid).filter(i => YOUR_MOVE.has(i.kind)).length;
+  const open = js.filter(j => !["merged","rejected"].includes(j.stage));
+  const banner = f.run.state === "stopped" ? `<div class="banner tone-stale" role="status"><span aria-hidden="true">■</span><div><div class="b-title">Factory stopped ${ago(f.run.heartbeat)} with ${open.length} open jobs</div><div class="b-body">Nothing below is moving. Jobs are in active stages but no job file has changed for 3 days. Run <code>/factory run</code> in <code>${f.path}</code> to resume every job from its stage.</div></div></div>`
+    : f.run.state === "idle" ? `<div class="banner tone-mute" role="status"><span aria-hidden="true">○</span><div><div class="b-title">Idle: the queue is empty</div><div class="b-body">Add a backlog item with <code>status: ready</code> and run <code>/factory run</code>.</div></div></div>` : "";
+
+  const lanes = [
+    { key:"needs-human", cls:"is-attn", kind:"you" },
+    { key:"needs-info", cls:"is-warn", kind:"author" },
+    ...ACTIVE.map(k => ({ key:k, cls:"", kind: ["gate","merging"].includes(k) ? "script" : k === "intake" ? "fable" : "agent" })),
+  ];
+  const colsTpl = lanes.map(l => js.some(j => j.stage === l.key) ? "minmax(184px, 1fr)" : "minmax(76px, 92px)").join(" ");
+  const board = `<div class="board" style="--cols:${colsTpl}" role="list" aria-label="Jobs by stage">${lanes.map(l => {
+      const items = js.filter(j => j.stage === l.key);
+      return `<section class="lane ${items.length ? l.cls : "is-empty"}" role="listitem" aria-label="${l.key}, ${items.length} jobs">
+        <div class="lane-head">${l.key} <span class="kind">${l.kind}</span><span class="n">${items.length}</span></div>
+        ${items.length ? items.map(jobCard).join("") : `<div class="lane-empty">—</div>`}</section>`;
+    }).join("")}</div>`;
+
+  const tableRows = open.sort((a,b) => STAGES.indexOf(b.stage === "needs-human" ? "zzz" : a.stage) - STAGES.indexOf(a.stage)).map(j =>
+    `<tr onclick="location.hash='#/f/${fid}/j/${j.id}'"><td><a href="#/f/${fid}/j/${j.id}" class="mono">${j.id}</a></td><td>${esc(j.title)}</td><td>${stageBadge(j.stage)}</td><td>${riskEl(j.risk)}</td>
+     <td>${j.surfaces.map(s=>`<span class="chip">${s}</span>`).join(" ") || '<span class="faint">—</span>'}</td><td>${j.reviewers.map(r => revEl(r, (j.live||{})[r.name])).join(" ") || '<span class="faint">—</span>'}</td>
+     <td class="num">${j.round ? `R${j.round}/${j.maxRounds}` : "—"}</td><td class="r num">${dur(NOW-j.created)}</td><td class="r num">${usd(j.cost)}</td></tr>`).join("");
+  const table = `<div class="panel"><div class="table-wrap"><table class="grid"><caption class="sr-only">Open jobs</caption><thead><tr><th>Job</th><th>Title</th><th>Stage</th><th>Risk</th><th>Surfaces</th><th>Reviewers</th><th>Round</th><th class="r">Elapsed</th><th class="r">Cost</th></tr></thead><tbody>${tableRows}</tbody></table></div></div>`;
+
+  const done = js.filter(j => ["merged","rejected"].includes(j.stage));
+  const doneHtml = `<section class="done-list" aria-labelledby="doneH"><div class="section-head"><h2 id="doneH">Done</h2><span class="count">${done.filter(j=>j.stage==="merged").length} merged · ${done.filter(j=>j.stage==="rejected").length} rejected · last 7 days</span></div>
+    <div class="panel"><div class="table-wrap"><table class="grid"><tbody>${done.map(j => `<tr onclick="location.hash='#/f/${fid}/j/${j.id}'"><td style="width:90px"><a class="mono" href="#/f/${fid}/j/${j.id}">${j.id}</a></td><td>${esc(j.title)}${j.rejectWhy ? `<div class="faint" style="font-size:var(--fs-xs)">${esc(j.rejectWhy)}</div>` : ""}</td><td>${stageBadge(j.stage)}</td><td class="hide-narrow num muted">${j.round ? j.round + (j.round>1?" rounds":" round") : "—"}</td><td class="r num hide-narrow">${dur(j.entered - j.created)}</td><td class="r num">${usd(j.cost)}</td><td class="r num muted hide-narrow">${ago(j.entered)}</td></tr>`).join("")}</tbody></table></div></div></section>`;
+
+  const spendOpen = open.reduce((s,j)=>s+j.cost,0);
+  return `
+    <div class="page-head"><div class="titles"><div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><h1>${f.name}</h1>${runBadge(f)}${f.kind === "game" ? '<span class="chip">game</span>' : ""}</div>
+      <div class="sub"><span class="mono">${f.path}</span><span>backlog: ${f.backlog.kind === "github" ? `<a href="#" onclick="return false">${f.backlog.label}</a>` : esc(f.backlog.label)}</span><span>merge: ${f.merge}</span>${f.run.concurrency ? `<span>concurrency ${f.run.concurrency}</span>` : ""}<span>${f.run.state === "running" ? "last write " + ago(f.run.heartbeat) : "last activity " + ago(f.lastActivity)}</span></div></div></div>
+    ${banner}
+    <div class="stats" role="group" aria-label="Factory totals">
+      <div class="stat"><div class="label">Your move · watch</div><div class="value"><span class="${mine ? "attn" : ""}" style="color:${mine ? "var(--st-attn)" : "inherit"}">${mine}</span> <span class="faint">·</span> <span style="color:${att-mine ? "var(--st-warn)" : "inherit"}">${att - mine}</span></div><div class="delta">blocked on you · stuck or waiting</div></div>
+      <div class="stat"><div class="label">In flight</div><div class="value">${js.filter(j=>ACTIVE.includes(j.stage)).length}</div><div class="delta">${f.run.concurrency ? "of " + f.run.concurrency + " slots" : "not running"}</div></div>
+      <div class="stat"><div class="label">Merged 7d</div><div class="value">${f.week.merged}</div><div class="delta">${f.week.rejected} rejected</div></div>
+      <div class="stat"><div class="label">Spend 7d</div><div class="value">${usd(f.week.spend)}</div><div class="delta">${usd(spendOpen)} on open jobs</div></div>
+      <div class="stat"><div class="label">Median job</div><div class="value">${fid === "tidepool" ? "3h 40m" : fid === "ledgerline" ? "1h 55m" : "—"}</div><div class="delta">${fid === "tidepool" ? "$5.15 · 1.8 rounds" : fid === "ledgerline" ? "$2.30 · 1.4 rounds" : "no merged jobs"}</div></div>
+    </div>
+    ${att ? `<div class="section">${viewAttention(fid)}</div>` : ""}
+    <section class="section" aria-labelledby="pH">
+      <div class="board-toolbar"><h2 id="pH">Pipeline</h2><span class="faint" style="font-size:var(--fs-sm)">${open.length} open</span><span style="flex:1"></span>
+        <div class="seg" role="group" aria-label="Layout"><button type="button" aria-pressed="${boardMode==="board"}" onclick="boardMode='board';render()">Board</button><button type="button" aria-pressed="${boardMode==="table"}" onclick="boardMode='table';render()">Table</button></div></div>
+      ${open.length ? (boardMode === "board" ? board : table) : `<div class="panel state-box"><h2>No open jobs</h2><p>Jobs appear here when <code>/factory run</code> picks up a ready backlog item.</p></div>`}
+    </section>
+    ${done.length ? doneHtml : ""}`;
+}
+
+function verdictEl(v) {
+  const label = { pass:"PASS", changes:"CHANGES", skip:"not run", running:"running" }[v] || "—";
+  return `<span class="verdict ${v||"skip"}">${label}</span>`;
+}
+
+function genericTimeline(j) {
+  const idx = FLOW.indexOf(j.stage);
+  const items = [];
+  const upto = j.stage === "needs-human" ? FLOW.indexOf("approve") : j.stage === "needs-info" || j.stage === "rejected" ? 0 : idx;
+  for (let i = 0; i <= Math.max(0, upto); i++) {
+    const s = FLOW[i]; const current = i === upto && !["needs-human","needs-info","rejected","merged"].includes(j.stage);
+    items.push({ stage:s, agent: s === "gate" || s === "merging" ? "script" : s, model: {intake:"fable",spec:"opus",build:"opus",approve:"opus"}[s] || (s==="review" ? "" : "script"),
+      at: j.created + (j.entered - j.created) * (i/(upto+1)), tone: current ? "run" : "ok", verdict: current ? "running" : "", file: current ? null : (s==="review" ? "review-code-1.md" : s + (s==="build"||s==="gate" ? "-1" : "") + (s==="gate"?".log":".md")),
+      summary: current ? [] : ["Summary bullets from this stage's file appear here (3–5 bullets)."] });
+  }
+  if (["needs-human","needs-info","rejected","merged"].includes(j.stage)) items.push({ stage:j.stage, agent:"job", model:"script", at:j.entered, tone: j.stage==="merged" ? "ok" : j.stage==="rejected" ? "mute" : j.stage==="needs-info" ? "warn" : "attn", verdict:"", file: j.stage==="merged" ? "approve.md" : j.stage==="needs-info" ? "intake.md" : "escalation.md", summary: j.attention ? [j.attention.ask] : j.rejectWhy ? [j.rejectWhy] : ["Merged."] });
+  return items;
+}
+
+const GATELOGS = {
+  "local-dash-cooldown:gate-2.log": `<span class="dim">$ factory/checks.sh   (main checkout copy, branch factory/local-dash-cooldown @ 9c41e2a)</span>
+<span class="dim">▸ cargo fmt --check ............................ ok   0.8s</span>
+<span class="dim">▸ cargo clippy -D warnings ..................... ok  41.2s</span>
+▸ cargo test --workspace
+    running 216 tests
+    test player::dash::cooldown_resets_on_respawn ... ok
+    test player::dash::dash_requires_contact_after_chain ... ok
+    <span class="fail">test levels::level_4_2_collision_unchanged ... FAILED</span>
+
+    ---- levels::level_4_2_collision_unchanged stdout ----
+    <span class="fail">assertion failed: mask_hash(&amp;level) == GOLDEN_4_2</span>
+      left: 0x9f13c0aa  right: 0x51d2e804
+    <span class="fail">test result: FAILED. 215 passed; 1 failed</span>
+<span class="fail">✕ gate FAIL (exit 101) after 2m 51s · log → builder (round 3)</span>`,
+  "gh-149:gate-1.log": `<span class="dim">$ factory/checks.sh   (branch factory/gh-149 @ 1be07d3)</span>
+<span class="dim">▸ pnpm lint ..................................... ok   6.1s</span>
+▸ pnpm typecheck
+<span class="fail">src/reports/summary.ts:48:11 - error TS2322: Type 'bigint' is not assignable to type 'number'.</span>
+<span class="fail">src/reports/summary.ts:52:20 - error TS2365: Operator '+' cannot be applied to types 'number' and 'bigint'.</span>
+<span class="dim">  … 2 more</span>
+<span class="fail">✕ gate FAIL (exit 2) after 1m 04s</span>`,
+  "gh-149:gate-2.log": `<span class="dim">$ factory/checks.sh   (branch factory/gh-149 @ 77a0c9e)</span>
+<span class="dim">▸ pnpm lint ..................................... ok   5.8s</span>
+<span class="dim">▸ pnpm typecheck ................................ ok  12.4s</span>
+▸ pnpm test
+  <span class="fail">FAIL  src/money/convert.property.test.ts</span>
+  <span class="fail">  ✕ sum rounds half-even for any currency (seed 1932847, 1000 runs)</span>
+      Counterexample: [{ currency: "JPY", lines: [0.5, 0.5, 0.5] }]
+      Expected: 2   Received: 1
+<span class="fail">✕ gate FAIL (exit 1) after 6m 40s</span>`,
+};
+
+function viewJob(fid, jid) {
+  const f = fById[fid]; const j = jobs.find(x => x.id === jid && x.f === fid);
+  if (!f || !j) return viewNotFound();
+  const d = detail[jid];
+  const tl = d ? d.timeline : genericTimeline(j);
+  if (d && !d._timed) { // sample data: lay steps end to end from job creation (real data reads timestamps from job.json)
+    let cur = j.created;
+    tl.forEach(it => { if (it.round) return; if (it.stage === "needs-human" || it.tone === "run") { it.at = j.entered; return; } it.at = cur; cur += (it.dur || 0) + min; });
+    d._timed = true;
+  }
+  const flowIdx = j.stage === "needs-human" ? FLOW.indexOf("approve") : FLOW.indexOf(j.stage);
+  const pipe = FLOW.map((s,i) => {
+    let cls = i < flowIdx ? "done" : i === flowIdx ? "current" : "";
+    if (j.stage === "merged") cls = "done";
+    if (i === flowIdx && j.stage === "needs-human") cls += " attn";
+    const label = i === flowIdx && j.stage === "needs-human" ? "approve ▲ needs-human" : s;
+    return `<div class="pipe ${cls}"${i===flowIdx ? ' aria-current="step"' : ""}>${label}</div>`;
+  }).join("");
+
+  const items = tl.map(it => {
+    if (it.round) return `<li class="round-sep" aria-hidden="false">Round ${it.round}</li>`;
+    const dot = { ok:"✓", warn:"!", attn: it.stage === "gate" ? "✕" : "▲", run:"●", mute:"✕" }[it.tone];
+    const key = jid + ":" + it.file;
+    return `<li class="tl-item"><span class="tl-dot ${it.tone}" aria-hidden="true">${dot}</span>
+      <div class="tl-head"><span class="stage-name">${it.stage}</span><span class="muted" style="font-size:var(--fs-sm)">${esc(it.agent)}${it.model ? ` <span class="model">${it.model}</span>` : ""}</span>
+        ${it.verdict ? `<span class="badge tone-${it.tone}">${esc(it.verdict)}</span>` : ""}
+        ${it.reviews ? Object.entries(it.reviews).map(([n,v]) => `<span class="rev ${v}"><span class="v">${v==="pass"?"✓":v==="changes"?"!":"–"}</span>${short(n)}</span>`).join("") : ""}
+        <span class="spacer"></span><span class="when">${new Date(it.at).toISOString().slice(11,16)} UTC · ${it.dur ? dur(it.dur) : it.tone === "run" ? "running " + dur(NOW-it.at) : ""}</span></div>
+      ${it.file ? `<div class="filecard"><div class="filecard-head"><span class="fn">${it.file}</span><span class="faint">## Summary</span><span class="spacer"></span><button type="button" class="link" data-file="${esc(it.file)}" data-job="${jid}" data-summary="${esc(JSON.stringify(it.summary))}">Open full file</button></div>
+        <ul>${it.summary.map(s => `<li>${esc(s)}</li>`).join("")}</ul>
+        ${it.gatelog && GATELOGS[jid + ":" + it.log] ? `<div class="filecard-head" style="border-top:1px solid var(--border)"><span class="fn">${it.log}</span><span class="faint">tail</span><span class="spacer"></span><button type="button" class="link" data-file="${esc(it.log)}" data-job="${jid}" data-summary="[]">Open full log</button></div><pre class="gatelog" aria-label="Gate log tail">${GATELOGS[jid + ":" + it.log]}</pre>` : ""}</div>`
+        : it.source ? `<div class="filecard"><div class="filecard-head"><span class="fn">${esc(it.source)}</span></div><ul>${it.summary.map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>`
+        : it.tone === "run" ? `<div class="filecard"><div style="padding:10px 12px"><span class="skel" style="width:60%"></span><span class="skel" style="width:40%;margin-top:6px"></span><div class="faint" style="font-size:var(--fs-xs);margin-top:8px">builder is writing build-${j.round}.md · summary appears when the file lands</div></div></div>` : ""}
+    </li>`;
+  }).join("");
+
+  const m = d ? d.matrix : { reviewers: j.reviewers.map(r=>r.name), rounds: j.round ? Array.from({length:j.round},(_,i)=> Object.fromEntries(j.reviewers.map(r => [r.name, i===j.round-1 && j.live ? j.live[r.name] : i===j.round-1 ? "skip" : "changes"]))) : [] };
+  const modelOf = (n) => (j.reviewers.find(r=>r.name===n)||{}).model || "";
+  const matrix = m.rounds.length ? `<table class="matrix"><caption class="sr-only">Reviewer verdicts per round</caption><thead><tr><th scope="col">Reviewer</th>${m.rounds.map((_,i)=>`<th scope="col">R${i+1}</th>`).join("")}</tr></thead><tbody>
+    ${m.reviewers.map(n => `<tr><th scope="row" style="font-weight:500">${short(n)} <span class="model">${modelOf(n)}</span></th>${m.rounds.map((r,i) => `<td>${["pass","changes"].includes(r[n]) ? `<button type="button" class="verdict-btn" data-file="review-${i+1}-${n}.md" data-job="${jid}" data-summary="[]" aria-label="${short(n)} round ${i+1}: ${r[n]}. Open review-${i+1}-${n}.md">${verdictEl(r[n])}</button>` : verdictEl(r[n])}</td>`).join("")}</tr>`).join("")}</tbody></table>
+    ${d && d.note ? `<p class="footnote">${esc(d.note)}</p>` : ""}`
+    : `<p class="faint">No review rounds yet.</p>`;
+
+  const costs = d ? d.costs : [["all agents","",j.cost]];
+  const costTotal = costs.reduce((s,c)=>s+c[2],0);
+  const costHtml = `<div class="cost-rows"><span class="h">Agent</span><span class="h">Model</span><span class="h" style="text-align:right">Cost</span>
+    ${costs.map(c => `<span>${c[0]}</span><span class="model">${c[1]}</span><span style="text-align:right">${usd(c[2])}</span>`).join("")}
+    <span class="total">Total</span><span class="total"></span><span class="total" style="text-align:right">${usd(costTotal)}</span></div>
+    <p class="footnote">Time: ${dur(NOW - j.created)} since created, ${dur(NOW - j.entered)} in ${j.stage}. Per-stage times are on the timeline.</p>
+    <p class="footnote">API-equivalent cost from subagent transcripts, priced with prices_usd_per_mtok. On a subscription this shows relative spend, not your bill. Orchestrator tokens aren't attributed.</p>`;
+
+  const attnBanner = j.attention ? `<div class="banner ${KIND_BADGE[j.attention.kind][0]}" role="status"><span aria-hidden="true">${KIND_BADGE[j.attention.kind][1]}</span><div><div class="b-title">${esc(j.attention.why)}</div><div class="b-body">${esc(j.attention.ask)}</div>
+    ${j.stage === "needs-human" ? `<div class="b-body" style="margin-top:6px">${j.pr ? `Merge PR #${j.pr.n} to approve, or send` : "Send"} direction with <code>/factory feedback ${j.id} "…"</code> (runs round ${j.round+1}), or <code>/factory reject ${j.id} "reason"</code>.</div>` : ""}</div></div>` : "";
+
+  return `
+    <div class="page-head"><div class="titles">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><span class="mono faint">${j.id}</span>${stageBadge(j.stage)}${riskEl(j.risk)}${j.surfaces.map(s=>`<span class="chip">${s}</span>`).join("")}</div>
+      <h1 style="margin-top:4px">${esc(j.title)}</h1>
+      <dl class="facts">
+        <div><dt>Source</dt><dd>${srcLink(j)}</dd></div>
+        <div><dt>PR / branch</dt><dd>${j.pr ? `<a href="#" onclick="return false">PR #${j.pr.n}</a>` : j.branch ? `<span class="mono">${j.branch}</span>` : '<span class="faint">none yet</span>'}</dd></div>
+        <div><dt>Round</dt><dd>${j.round ? `${j.round} of ${j.maxRounds}` : "—"}</dd></div>
+        <div><dt>Elapsed</dt><dd>${dur(NOW-j.created)} <span class="faint">· ${dur(NOW-j.entered)} in stage</span></dd></div>
+        <div><dt>Cost</dt><dd>${usd(j.cost)}</dd></div>
+        <div><dt>Folder</dt><dd class="mono faint" style="font-size:var(--fs-xs)">factory/jobs/${j.id}/</dd></div>
+      </dl></div>
+      <div class="links"><a class="btn" href="#" onclick="return false">${fById[fid].backlog.kind === "github" ? "Issue " + j.src : "Backlog file"} ↗</a>${j.pr ? `<a class="btn" href="#" onclick="return false">PR #${j.pr.n} ↗</a>` : ""}<button class="btn" type="button" onclick="navigator.clipboard&&navigator.clipboard.writeText('${fById[fid].path}/factory/jobs/${j.id}/')">Copy job path</button></div>
+    </div>
+    ${attnBanner}
+    <nav class="pipeline" aria-label="Pipeline position">${pipe}</nav>
+    <div class="job-layout">
+      <section aria-labelledby="tlH"><div class="section-head"><h2 id="tlH">Timeline</h2><span class="count">${tl.filter(x=>!x.round).length} steps · newest last</span></div>
+        <ol class="timeline">${items}</ol></section>
+      <aside class="side" aria-label="Job details">
+        <div class="panel"><h3>Reviews by round</h3>${matrix}</div>
+        <div class="panel"><h3>Routing</h3>${j.reviewers.length ? `<div class="card-row">${j.reviewers.map(r=>revEl(r)).join("")}</div><p class="footnote">From risk <b>${j.risk}</b>${j.surfaces.length ? " + surfaces " + j.surfaces.join(", ") : ""} via config.json. Builder: opus.</p>` : `<p class="faint">Not routed yet (intake decides risk and surfaces).</p>`}</div>
+        <div class="panel"><h3>Cost and time</h3>${costHtml}</div>
+      </aside>
+    </div>`;
+}
+
+function viewNotFound() { return `<div class="panel state-box"><h2>Not found</h2><p>This factory or job isn't in the registry any more.</p><p><a href="#/">Back to all factories</a></p></div>`; }
+
+function viewLoading() {
+  const row = `<tr><td><span class="skel" style="width:110px"></span><span class="skel" style="width:150px;height:9px;margin-top:6px"></span></td><td><span class="skel" style="width:140px"></span></td><td><span class="skel" style="width:90px"></span></td><td><span class="skel" style="width:120px"></span></td><td><span class="skel" style="width:40px;margin-left:auto"></span></td><td><span class="skel" style="width:50px;margin-left:auto"></span></td><td><span class="skel" style="width:60px;margin-left:auto"></span></td></tr>`;
+  return `<div class="page-head"><div class="titles"><h1>All factories</h1><div class="sub" role="status"><span>Reading ~/.claude/factory/registry.json…</span></div></div></div>
+    <div class="panel"><table class="grid" aria-busy="true"><thead><tr><th>Factory</th><th>Backlog</th><th>Waiting on you</th><th>Now</th><th class="r">Merged 7d</th><th class="r">Spend 7d</th><th class="r">Last activity</th></tr></thead><tbody>${row.repeat(4)}</tbody></table></div>`;
+}
+function viewEmpty() {
+  return `<div class="panel state-box"><h2>No factories yet</h2><p>The registry at <code>~/.claude/factory/registry.json</code> is empty.</p><p>Open a project in Claude Code and run the onboarding skill to set up its factory. It will show up here within a few seconds.</p></div>`;
+}
+function viewError() {
+  return `<div class="panel state-box" role="alert"><h2>Can't read the registry</h2><p><code>~/.claude/factory/registry.json</code>: Unexpected token '}' at line 14, column 3.</p><p>No data has loaded yet in this session. Fix the file and the page recovers on the next poll (every 5 s). Once data has loaded, a later read failure keeps the last good data on screen under an error bar instead of blanking the page.</p><p><button class="btn" type="button">Retry now</button></p></div>`;
+}
+
+/* ======================================================================
+   Router + shell
+   ====================================================================== */
+function route() {
+  const h = location.hash.replace(/^#\/?/, "").split("/").filter(Boolean);
+  if (h[0] === "f" && h[2] === "j") return { name:"job", fid:h[1], jid:h[3] };
+  if (h[0] === "f") return { name:"factory", fid:h[1] };
+  return { name:"overview" };
+}
+function crumbs(r) {
+  const parts = [`<a href="#/"${r.name==="overview"?' aria-current="page"':""}>All</a>`];
+  if (r.fid) parts.push(`<span class="sep">/</span>`, `<a href="#/f/${r.fid}"${r.name==="factory"?' aria-current="page"':""}>${r.fid}</a>`);
+  if (r.jid) parts.push(`<span class="sep">/</span>`, `<span aria-current="page" class="mono">${r.jid}</span>`);
+  return parts.join(" ");
+}
+function render() {
+  const r = route();
+  document.getElementById("crumbs").innerHTML = crumbs(r);
+  const n = attentionItems(null).filter(i => YOUR_MOVE.has(i.kind)).length;
+  const ac = document.getElementById("attnCount");
+  ac.innerHTML = `▲ <span class="num">${n}</span> blocked on you`; ac.style.display = (demoState === "live" && n) ? "" : "none";
+  const poll = document.getElementById("poll");
+  poll.className = "poll" + (demoState === "error" ? " is-error" : demoState === "loading" ? " is-paused" : "");
+  document.getElementById("pollAge").textContent = demoState === "error" ? "read failed 5s ago" : demoState === "loading" ? "loading…" : "4s ago";
+  let html;
+  if (demoState === "loading") html = viewLoading();
+  else if (demoState === "empty") html = viewEmpty();
+  else if (demoState === "error") html = viewError();
+  else html = r.name === "job" ? viewJob(r.fid, r.jid) : r.name === "factory" ? viewFactory(r.fid) : viewOverview();
+  const app = document.getElementById("app");
+  app.innerHTML = html;
+  const cur = app.querySelector('.pipeline [aria-current="step"]');
+  if (cur) cur.parentElement.scrollLeft = cur.offsetLeft - cur.parentElement.offsetLeft - 24;
+  document.title = (r.jid ? r.jid + " · " : r.fid ? r.fid + " · " : "") + "Factory Dashboard";
+}
+
+const stateBtns = document.getElementById("stateBtns");
+["live","loading","empty","error"].forEach(s => {
+  const b = document.createElement("button"); b.type = "button"; b.textContent = s; b.setAttribute("aria-pressed", s === demoState);
+  b.onclick = () => { demoState = s; stateBtns.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); render(); };
+  stateBtns.append(b, " ");
+});
+
+/* Theme: system → light → dark */
+const themes = ["system","light","dark"]; let ti = 0;
+try { const saved = localStorage.getItem("factory-theme"); if (themes.includes(saved)) ti = themes.indexOf(saved); } catch (e) {}
+function applyTheme() {
+  const th = themes[ti];
+  if (th === "system") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", th);
+  document.getElementById("themeLabel").textContent = th[0].toUpperCase() + th.slice(1);
+  document.getElementById("themeBtn").setAttribute("aria-label", "Theme: " + th + ". Click to change");
+  try { localStorage.setItem("factory-theme", th); } catch (e) {}
+}
+document.getElementById("themeBtn").onclick = () => { ti = (ti+1) % 3; applyTheme(); };
+applyTheme();
+
+/* File dialog */
+const dlg = document.getElementById("fileDlg");
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-file]"); if (!b) return;
+  const file = b.dataset.file, summary = JSON.parse(b.dataset.summary);
+  document.getElementById("dlgTitle").textContent = file;
+  document.getElementById("dlgMeta").textContent = "factory/jobs/" + b.dataset.job + "/";
+  const isLog = file.endsWith(".log"), key = b.dataset.job + ":" + file;
+  document.getElementById("dlgBody").innerHTML = isLog
+    ? `<pre class="gatelog" style="border:0;border-radius:6px">${GATELOGS[key] || "checks.sh output…"}</pre>`
+    : `<h2>Summary</h2>${summary.length ? `<ul>${summary.map(s=>`<li>${esc(s)}</li>`).join("")}</ul>` : `<p class="faint">(the file's own 3–5 summary bullets)</p>`}
+       <h2>Detail</h2><p>The rest of <code>${esc(file)}</code> renders here as Markdown: the agent's reasoning, the diff hunks it refers to, and any questions it raised.</p>
+       <pre><code>// e.g. player/tuning.ron
+DashTuning(
+    cooldown_s: 0.35,
+    reset_on_wall_contact: false,
+)</code></pre>
+       <h2>Verdict</h2><pre><code>Verdict: PASS</code></pre><p class="faint">Plain <code>Key: VALUE</code> lines, parsed by factory/bin/job.</p>`;
+  dlg.showModal(); document.getElementById("dlgClose").focus();
+});
+document.getElementById("dlgClose").onclick = () => dlg.close();
+document.getElementById("dlgCopy").onclick = () => { try { navigator.clipboard.writeText(document.getElementById("dlgMeta").textContent + document.getElementById("dlgTitle").textContent); } catch (e) {} };
+
+window.addEventListener("hashchange", () => { render(); document.getElementById("app").focus({preventScroll:true}); window.scrollTo(0,0); });
+render();
+</script>
+</body>
+</html>

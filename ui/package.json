@@ -1,0 +1,38 @@
+{
+  "name": "factory-dashboard",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Read-only dashboard for every registered software factory.",
+  "engines": {
+    "bun": ">=1.2"
+  },
+  "scripts": {
+    "dev": "bun server/dev.ts",
+    "demo": "bun test/fixtures/generate.mjs && FACTORY_REGISTRY=.demo/registry.json bun server/dev.ts",
+    "build": "bun --bun vite build",
+    "start": "bun run build && bun server/reader.ts",
+    "reader": "bun server/reader.ts",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "login:install": "bun scripts/login-agent.ts install",
+    "login:uninstall": "bun scripts/login-agent.ts uninstall",
+    "login:status": "bun scripts/login-agent.ts status"
+  },
+  "dependencies": {
+    "@fontsource-variable/inter": "5.3.0",
+    "@fontsource-variable/jetbrains-mono": "5.3.0",
+    "@fontsource-variable/space-grotesk": "5.3.0",
+    "@solidjs/router": "2.0.1",
+    "@solidjs/web": "2.0.4",
+    "dompurify": "3.5.0",
+    "marked": "18.3.0",
+    "solid-js": "2.0.4"
+  },
+  "devDependencies": {
+    "@solidjs/vite-plugin": "3.0.1",
+    "@types/bun": "1.4.5",
+    "typescript": "7.0.2",
+    "vite": "8.4.0"
+  }
+}
