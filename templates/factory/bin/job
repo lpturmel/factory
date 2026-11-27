@@ -8,6 +8,8 @@
     factory/bin/job list [--all]         "<id> <stage> r<round> <note>" per job
     factory/bin/job show <id> [field]    print job.json (or one top-level field)
     factory/bin/job new <ref>            create a job for one backlog ref
+    factory/bin/job pick <id|ref>        resolve one job by id or backlog ref; create it from a
+                                         ready backlog item (ignores concurrency); print "<id> <stage>"
     factory/bin/job feedback <id>        stdin = the human's words -> feedback-<k>.md (+ new round)
     factory/bin/job approve <id>         human approval of a needs-human job -> merge
     factory/bin/job reject <id>          stdin = reason -> comment, close PR, stage rejected
@@ -208,6 +210,31 @@ def cmd_sync(config):
     for j in all_jobs():
         if j["stage"] not in TERMINAL:
             print("%s %s" % (j["id"], j["stage"]))
+
+
+def cmd_pick(config, arg):
+    """Resolve exactly one job for `/factory run <id>`: an existing job id, the open
+    job for a backlog ref, or a new job for a ref that is ready in the backlog.
+    Ignores concurrency. Never fetches a ref that list_ready did not return."""
+    if not re.fullmatch(r"[A-Za-z0-9._-]+", arg or ""):
+        raise Refused("bad id or ref %r (allowed: letters, digits, '.', '_', '-')" % (arg or ""))
+    # Only touch job_dir/load for args shaped like a job id: they die on anything else.
+    if re.fullmatch(r"[a-z0-9][a-z0-9-]*", arg) and (F.JOBS / arg / "job.json").exists():
+        job = load(arg)
+        if job["stage"] in TERMINAL:
+            raise Refused("%s is already %s" % (job["id"], job["stage"]))
+        return "%s %s" % (job["id"], job["stage"])
+    job = open_ref(arg)
+    if job:
+        return "%s %s" % (job["id"], job["stage"])
+    closed = [j for j in all_jobs() if j["issue"].get("ref") == arg]
+    if closed:
+        last = closed[-1]
+        raise Refused("%s is already %s" % (last["id"], last["stage"]))
+    if arg in {item["ref"] for item in backlog.list_ready(config)}:
+        job = new_job(config, arg)
+        return "%s %s" % (job["id"], job["stage"])
+    raise Refused("no job or ready backlog item for %s" % arg)
 
 
 # ---------------- helpers for next ----------------
@@ -768,6 +795,8 @@ def main(argv):
                 raise Refused("ref %s already has open job %s" % (args[0], j["id"]))
             j = new_job(config, args[0])
             print("%s %s" % (j["id"], j["stage"]))
+        elif cmd == "pick" and len(args) == 1:
+            print(cmd_pick(config, args[0]))
         elif cmd == "check" and len(args) == 1:
             return cmd_check(load(args[0]))
         elif cmd in ("next", "feedback", "reject", "approve", "merge", "move", "cost") and args:

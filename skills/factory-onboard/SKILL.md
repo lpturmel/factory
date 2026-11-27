@@ -186,5 +186,7 @@ protected paths; warn that reviewers are then the only judge).
   changing the factory's own files.
 - Tell the user how to start: add a backlog item (`factory/backlog/*.md` with
   `status: ready`, or label an issue `factory`), then run `/factory run` in a
-  Claude Code session in the project. `/factory status` lists jobs;
-  `/factory <words>` sends feedback, approves or rejects.
+  Claude Code session in the project. `/factory run <id>` drives just one
+  job; `/factory status` lists jobs; `/factory approve <id>` approves a job
+  waiting on them; `/factory reject <id> <why>` rejects one;
+  `/factory <words>` sends feedback to a job's builder.
