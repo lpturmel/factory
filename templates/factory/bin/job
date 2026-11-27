@@ -11,6 +11,8 @@
     factory/bin/job feedback <id>        stdin = the human's words -> feedback-<k>.md (+ new round)
     factory/bin/job approve <id>         human approval of a needs-human job -> merge
     factory/bin/job reject <id>          stdin = reason -> comment, close PR, stage rejected
+    factory/bin/job retry <id>           forget spawn counts for out files that are still
+                                         missing, so `next` spawns their agents again
     factory/bin/job merge <id>           sync with base, gate again, merge (stage merging)
     factory/bin/job move <id> <stage>    low-level move, still checked against TRANSITIONS
     factory/bin/job cost <id>            recompute cost from subagent transcripts
@@ -20,6 +22,9 @@
     <id> <stage> SPAWN <agent>:<model> [<agent>:<model> ...] [out=<file>,...]
     <id> <stage> WAIT <author|human> <note>
     <id> <stage> DONE <merged|rejected>
+    ERROR <id>: <agent> did not write <file>[; <agent> did not write <file> ...]
+        (an out file was asked for MAX_SPAWNS times and still does not exist;
+         `next` goes on once the file exists, or after `job retry <id>`)
     ERROR <message>
 """
 import fcntl
@@ -59,6 +64,8 @@ TRANSITIONS = {
 TERMINAL = {"merged", "rejected"}
 WAITING = {"needs-info": "author", "needs-human": "human"}
 FIXED_ROLES = ["intake", "spec-writer", "builder", "approver"]
+# How many times `next` asks for a missing out file before it stops with ERROR.
+MAX_SPAWNS = 2
 
 
 class Refused(Exception):
@@ -217,10 +224,30 @@ def jpath(job, name):
 
 
 def spawn(job, *agents, out=None):
+    """The SPAWN line. Counts every out file in job["spawns"] and saves first."""
+    if out:
+        counts = job.setdefault("spawns", {})
+        for name in out:
+            counts[name] = counts.get(name, 0) + 1
+        save(job)
     line = "%s %s SPAWN %s" % (job["id"], job["stage"], " ".join(agents))
     if out:
         line += " out=" + ",".join(out)
     return line
+
+
+def spawn_missing(job, pairs, uncapped=()):
+    """Spawn for out files that do not exist yet, at most MAX_SPAWNS times each.
+    pairs: [(agent:model, out file)]. Any exhausted pair -> ERROR naming every
+    exhausted one, and nothing is spawned. Out files in `uncapped` (respawns
+    after invalidate()) are counted but never block."""
+    counts = job.get("spawns") or {}
+    gone = ["%s did not write %s" % (agent.split(":", 1)[0], name)
+            for agent, name in pairs
+            if name not in uncapped and counts.get(name, 0) >= MAX_SPAWNS]
+    if gone:
+        return "ERROR %s: %s" % (job["id"], "; ".join(gone))
+    return spawn(job, *[a for a, _ in pairs], out=[n for _, n in pairs])
 
 
 def wait(job, who, note):
@@ -349,7 +376,7 @@ def step(config, job):
     if st == "intake":
         f = jpath(job, "intake.md")
         if not f.exists():
-            return spawn(job, "intake:" + m["intake"], out=["intake.md"])
+            return spawn_missing(job, [("intake:" + m["intake"], "intake.md")])
         text = f.read_text()
         dec = F.verdict(text, "Decision", {"ACCEPT", "NEEDS-INFO", "REJECT"})
         risk = (F.verdict(text, "Risk", set(F.RISKS) | {x.upper() for x in F.RISKS}) or "").lower() or None
@@ -402,19 +429,20 @@ def step(config, job):
             k += 1
         if jpath(job, "intake.md").exists():
             jpath(job, "intake.md").rename(jpath(job, "intake-%d.md" % k))
+        job.setdefault("spawns", {}).pop("intake.md", None)
         move(job, "intake", "author replied")
         return spawn(job, "intake:" + m["intake"], out=["intake.md"])
 
     if st == "spec":
         if not jpath(job, "spec.md").exists():
-            return spawn(job, "spec-writer:" + m["spec-writer"], out=["spec.md"])
+            return spawn_missing(job, [("spec-writer:" + m["spec-writer"], "spec.md")])
         move(job, "build", "spec written", round_inc=True)
         return spawn(job, "builder:" + m["builder"], out=["build-%d.md" % job["round"]])
 
     if st == "build":
         out = "build-%d.md" % job["round"]
         if not jpath(job, out).exists():
-            return spawn(job, "builder:" + m["builder"], out=[out])
+            return spawn_missing(job, [("builder:" + m["builder"], out)])
         move(job, "gate", "build round %d done" % job["round"])
         st = "gate"
 
@@ -434,25 +462,28 @@ def step(config, job):
     if st == "review":
         r = str(job["round"])
         got = job["verdicts"]["review"].setdefault(r, {})
-        missing = []
+        missing = []    # (agent:model, out file), in reviewer order
+        respawn = set()  # out files set aside by invalidate(): respawned uncapped, as before
         for rev in job["reviewers"]:
-            f = jpath(job, "review-%s-%s.md" % (r, rev["name"]))
+            name = "review-%s-%s.md" % (r, rev["name"])
+            pair = ("%s:%s" % (rev["name"], rev["model"]), name)
+            f = jpath(job, name)
             if rev["name"] in got:
                 continue
             if not f.exists():
-                missing.append(rev)
+                missing.append(pair)
                 continue
             v = F.verdict(f.read_text(), "Verdict", {"PASS", "CHANGES"})
             if v is None:
                 if invalidate(f):
-                    missing.append(rev)
+                    missing.append(pair)
+                    respawn.add(name)
                     continue
                 v = "CHANGES"
             got[rev["name"]] = v
         save(job)
         if missing:
-            return spawn(job, *["%s:%s" % (x["name"], x["model"]) for x in missing],
-                         out=["review-%s-%s.md" % (r, x["name"]) for x in missing])
+            return spawn_missing(job, missing, uncapped=respawn)
         changes = [n for n, v in got.items() if v != "PASS"]
         if changes:
             return next_round(config, job, "CHANGES from " + ", ".join(changes))
@@ -463,7 +494,7 @@ def step(config, job):
         out = "approve-%d.md" % job["round"]
         f = jpath(job, out)
         if not f.exists():
-            return spawn(job, "approver:" + m["approver"], out=[out])
+            return spawn_missing(job, [("approver:" + m["approver"], out)])
         dec = F.verdict(f.read_text(), "Decision", {"APPROVE", "ESCALATE"})
         if dec is None:
             if invalidate(f):
@@ -644,6 +675,19 @@ def cmd_approve(config, job):
     return do_merge(config, job)
 
 
+def cmd_retry(job):
+    """Forget the spawn counts of out files that still do not exist, so `next` asks again."""
+    if job["stage"] in TERMINAL:
+        raise Refused("%s is %s" % (job["id"], job["stage"]))
+    counts = job.setdefault("spawns", {})
+    cleared = sorted(n for n in counts if not jpath(job, n).exists())
+    for n in cleared:
+        del counts[n]
+    save(job)
+    return "%s %s OK retry: %s" % (job["id"], job["stage"],
+                                   "cleared " + ",".join(cleared) if cleared else "nothing to clear")
+
+
 def cmd_check(job):
     """Run the main checkout's checks.sh in the job worktree. Changes no state."""
     import subprocess
@@ -770,7 +814,7 @@ def main(argv):
             print("%s %s" % (j["id"], j["stage"]))
         elif cmd == "check" and len(args) == 1:
             return cmd_check(load(args[0]))
-        elif cmd in ("next", "feedback", "reject", "approve", "merge", "move", "cost") and args:
+        elif cmd in ("next", "feedback", "reject", "approve", "merge", "move", "cost", "retry") and args:
             jid = args[0]
             with locked(jid):
                 job = load(jid)
@@ -783,6 +827,8 @@ def main(argv):
                     out = cmd_reject(config, job, sys.stdin.read())
                 elif cmd == "approve":
                     out = cmd_approve(config, job)
+                elif cmd == "retry":
+                    out = cmd_retry(job)
                 elif cmd == "merge":
                     if job["stage"] != "merging":
                         raise Refused("%s is %s, not merging" % (jid, job["stage"]))

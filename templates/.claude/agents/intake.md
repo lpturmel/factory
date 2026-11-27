@@ -62,3 +62,6 @@ Surfaces: ui, security | none
 ```
 
 Then reply with one line, e.g. `intake ACCEPT risk=medium surfaces=ui`.
+If writing your `Write:` file fails or is denied, your one-line reply must be
+an error naming the file and the failure, e.g.
+`intake ERROR: could not write <file>: <reason>`, and never a success line.
