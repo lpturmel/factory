@@ -36,6 +36,9 @@ a command that isn't pre-approved is simply denied. So:
   `job.json`; never `cd` into it.
 - Read files with the Read tool, find them with Glob/Grep. Don't `cat`, `ls`
   or `find` through the shell.
+- If you run or import the repo's Python scripts by hand, set
+  `PYTHONDONTWRITEBYTECODE=1`. Never leave a `__pycache__/` directory in the
+  worktree.
 
 ## Focus
 
