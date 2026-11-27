@@ -15,6 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import factorylib as F  # noqa: E402
 
@@ -41,7 +42,7 @@ def main():
     checks = F.FACTORY / "checks.sh"
     if not wt or not Path(wt).is_dir() or not checks.exists():
         return 0
-    env = dict(os.environ, FACTORY_WORKTREE=wt, FACTORY_ROOT=str(F.ROOT))
+    env = dict(os.environ, FACTORY_WORKTREE=wt, FACTORY_ROOT=str(F.ROOT), PYTHONDONTWRITEBYTECODE="1")
     try:
         p = subprocess.run(["bash", str(checks)], cwd=wt, env=env, text=True,
                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=1200)

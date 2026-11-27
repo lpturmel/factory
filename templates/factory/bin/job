@@ -41,6 +41,7 @@ from importlib.machinery import SourceFileLoader
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
+sys.dont_write_bytecode = True
 sys.path.insert(0, str(HERE))
 import factorylib as F  # noqa: E402
 
@@ -760,7 +761,7 @@ def cmd_check(job):
     if not wt or not Path(wt).is_dir():
         print("ERROR %s has no worktree" % job["id"])
         return 1
-    env = dict(os.environ, FACTORY_WORKTREE=wt, FACTORY_ROOT=str(F.ROOT))
+    env = dict(os.environ, FACTORY_WORKTREE=wt, FACTORY_ROOT=str(F.ROOT), PYTHONDONTWRITEBYTECODE="1")
     p = subprocess.run(["bash", str(F.FACTORY / "checks.sh")], cwd=wt, env=env, text=True,
                        stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
     print("\n".join(p.stdout.rstrip().splitlines()[-80:]))
