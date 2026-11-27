@@ -126,8 +126,10 @@ protected paths; warn that reviewers are then the only judge).
    anything not pre-approved is silently denied and the job stalls. Adds to
    `.claude/settings.json`: allow `Bash(factory/bin/job:*)`,
    `Bash(factory/bin/backlog list)`, `Bash(git -C:*)`, `Bash(chmod +x:*)`,
-   `Read`, `Glob`, `Grep`, `Edit`, `Write`; deny `Bash(git push:*)` and
-   `Bash(git -C * push:*)` (only `factory/bin/job` pushes). `No`: they'll
+   `Read`, `Glob`, `Grep`, `Edit`, `Write`. It denies nothing, so you can
+   still push from Claude; `git push` isn't pre-approved, and the agents are
+   told never to push (`factory/bin/job` does). On update it removes the
+   `git push` deny rules older installs added. `No`: they'll
    have to approve tools some other way before `/factory run` works unattended.
 2. *Models* — "Keep the default models?" `Yes (Recommended)`: intake on
    Fable, spec-writer/builder/approver on Opus 5.5 (`claude-opus-5-5`),

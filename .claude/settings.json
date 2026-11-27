@@ -12,10 +12,6 @@
       "Write",
       "Bash(/Users/lpturmel/dev2/factory/factory/bin/job:*)",
       "Bash(bun:*)"
-    ],
-    "deny": [
-      "Bash(git push:*)",
-      "Bash(git -C * push:*)"
     ]
   }
 }

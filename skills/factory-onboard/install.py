@@ -51,8 +51,9 @@ ALLOW = [
     "Bash(chmod +x:*)",
     "Read", "Glob", "Grep", "Edit", "Write",
 ]
-# Agents never push; factory/bin/job does, outside Claude's tools.
-DENY = ["Bash(git push:*)", "Bash(git -C * push:*)"]
+# Older installs denied git push, which also blocked the user's own pushes
+# from Claude. Updates remove exactly these entries; nothing is denied now.
+LEGACY_DENY = ["Bash(git push:*)", "Bash(git -C * push:*)"]
 NAME_RE = re.compile(r"^[a-z][a-z0-9-]*$")
 
 
@@ -187,17 +188,20 @@ def update_settings(inst):
     path = inst.p / ".claude" / "settings.json"
     s = json.loads(path.read_text()) if path.exists() else {}
     perms = s.setdefault("permissions", {})
-    allow, deny = perms.setdefault("allow", []), perms.setdefault("deny", [])
+    allow = perms.setdefault("allow", [])
     want = ALLOW + ["Bash(%s/factory/bin/job:*)" % inst.p]  # agents sometimes use the absolute path
     add = [w for w in want if w not in allow]
-    add_deny = [w for w in DENY if w not in deny]
-    if not add and not add_deny:
+    drop = [d for d in perms.get("deny", []) if d in LEGACY_DENY]
+    if not add and not drop:
         print("ok     .claude/settings.json")
         return
     allow.extend(add)
-    deny.extend(add_deny)
-    print("%s .claude/settings.json (+allow %s; +deny %s)" % ("would " if inst.dry else "update",
-          ", ".join(add) or "-", ", ".join(add_deny) or "-"))
+    if drop:
+        perms["deny"] = [d for d in perms["deny"] if d not in LEGACY_DENY]
+        if not perms["deny"]:
+            del perms["deny"]
+    print("%s .claude/settings.json (+allow %s; -deny %s)" % ("would " if inst.dry else "update",
+          ", ".join(add) or "-", ", ".join(drop) or "-"))
     if not inst.dry:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(s, indent=2) + "\n")
