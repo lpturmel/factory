@@ -197,6 +197,9 @@ def open_ref(ref):
 
 
 def cmd_sync(config):
+    err = F.main_checkout_error()
+    if err:
+        raise Refused(err)
     limit = int(config.get("concurrency", 3))
     busy = [j for j in all_jobs() if j["stage"] not in TERMINAL and j["stage"] not in WAITING]
     if len(busy) < limit:

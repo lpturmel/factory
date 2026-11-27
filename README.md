@@ -46,6 +46,9 @@ the files, gitignores `factory/jobs/` and `factory/worktrees/`, and adds the
 project to `~/.claude/factory/registry.json`.
 
 Then, in that project: add a backlog item and run `/factory run`.
+Run `/factory` from a Claude Code session opened in the project's main
+checkout, not in a worktree session: project permissions only apply there,
+and `factory/bin/job sync` refuses to start anywhere else.
 `/factory run <id>` drives just one job (a job id or backlog ref);
 `/factory status` lists jobs; `/factory approve <id>` approves a job waiting on
 you; `/factory reject <id> <why>` rejects one; `/factory <anything else>` sends
