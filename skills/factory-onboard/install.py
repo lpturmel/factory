@@ -20,6 +20,8 @@ answers.json:
   "reviewers": [{"name", "purpose", "model", "when", "focus"}],
   "checks": ["npm run lint", "npm test"],
   "models": {"intake": "fable", ...},            (optional)
+  "efforts": {"code-reviewer": "low", ...},      (optional: agent -> low|medium|high|xhigh|max;
+                                                  keys are fixed agents or reviewer names)
   "permissions": true                            (optional: pre-approve what background agents need)
 }
 
@@ -42,6 +44,7 @@ from pathlib import Path
 FIXED_AGENTS = ["intake", "spec-writer", "builder", "approver"]
 GITIGNORE = ["factory/jobs/", "factory/worktrees/"]
 RISKS = ["low", "medium", "high"]
+EFFORTS = ["low", "medium", "high", "xhigh", "max"]
 # Background subagents can't answer permission prompts, so an unattended run
 # needs these pre-approved. Agents are told to use exactly these shapes.
 ALLOW = [
@@ -108,6 +111,30 @@ def validate(a):
         for w in whens if isinstance(whens, list) else [whens]:
             if w != "always" and w not in RISKS and w not in surfaces:
                 die("reviewer %s: when=%r is not always, a risk level, or a surface" % (r["name"], w))
+    if "efforts" in a:
+        validate_efforts(a["efforts"], FIXED_AGENTS + [r["name"] for r in a["reviewers"]])
+
+
+def shown(v):
+    """A value made safe to echo on one line: JSON-quoted, at most 40 characters."""
+    s = v[:38] if isinstance(v, str) else v  # 38 + two quotes
+    try:
+        out = json.dumps(s)
+    except (TypeError, ValueError):
+        out = repr(s)
+    return out[:40]
+
+
+def validate_efforts(efforts, known):
+    """Same rules as factorylib.efforts_error: an object of known agent -> one of EFFORTS."""
+    allowed = "allowed: %s" % ", ".join(EFFORTS)
+    if not isinstance(efforts, dict):
+        die("efforts must be an object of agent -> effort (%s)" % allowed)
+    for k, v in efforts.items():
+        if k not in known:
+            die("efforts key %s is not a known agent (agents: %s; %s)" % (shown(k), ", ".join(known), allowed))
+        if not isinstance(v, str) or v not in EFFORTS:
+            die("efforts[%s] = %s is not a valid effort (%s)" % (shown(k), shown(v), allowed))
 
 
 def describe_when(when):
@@ -177,6 +204,8 @@ def build_config(tmpl, a):
         c["surfaces"] = a["surfaces"]
     if a.get("models"):
         c["models"]["agents"].update(a["models"])
+    if a.get("efforts"):
+        c["models"]["efforts"] = dict(a["efforts"])
     c["reviewers"] = [{k: r[k] for k in ("name", "purpose", "model", "when") if k in r} for r in a["reviewers"]]
     return json.dumps(c, indent=2) + "\n"
 

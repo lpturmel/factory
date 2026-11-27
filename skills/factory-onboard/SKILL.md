@@ -135,6 +135,12 @@ protected paths; warn that reviewers are then the only judge).
    Fable, spec-writer/builder/approver on Opus 5.5 (`claude-opus-5-5`),
    reviewers on Haiku/Sonnet by risk, security on Opus. `Change them` → ask
    which role and which alias (`fable`, `opus`, `sonnet`, `haiku`).
+   Then the optional effort step: "Set a reasoning effort for any agent?"
+   `No (Recommended)`: every agent runs at its default effort, and
+   `efforts` stays out of the answers. `Yes` → ask which agent (a fixed role
+   or one of the chosen reviewers) and which effort (`low`, `medium`, `high`,
+   `xhigh`, `max`), as many times as they like, and put each pair in
+   `efforts`.
 
 ## 3. Install
 
@@ -153,9 +159,13 @@ protected paths; warn that reviewers are then the only judge).
      "reviewers": [{"name": "code-reviewer", "purpose": "...", "model": {"low": "haiku", "medium": "sonnet", "high": "sonnet"}, "when": "always", "focus": "- ...\n- ..."}],
      "checks": ["npm run lint", "npm test"],
      "models": {"intake": "fable", "spec-writer": "opus", "builder": "opus", "approver": "opus"},
+     "efforts": {},
      "permissions": true
    }
    ```
+
+   `efforts` is optional: leave it out (or `{}`) unless the user set an
+   effort, e.g. `{"code-reviewer": "low", "builder": "high"}`.
 
 2. `python3 <base>/install.py --project <project> --answers <file> --dry-run`
    and show the user the file list. Add `--force` only if they chose to update
