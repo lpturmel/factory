@@ -80,11 +80,19 @@ it doesn't, show the usage (`run [<id>] | status | approve <id> | reject <id>
 4. When a background agent finishes, note its one-line reply. **Wait for all
    of a job's running agents** (e.g. every reviewer) before calling
    `factory/bin/job next <id>` for that job again; then go to step 3.
+   - If an agent's one-line reply starts with `ERROR` (e.g.
+     `ERROR code-reviewer could not write <file>: no Write tool`), that job
+     is **stopped**. Still wait for that job's other running agents to
+     finish, but then do not call `factory/bin/job next <id>` for it and do
+     not respawn any agent for it. Tell the user which agent failed and its
+     message. The user decides, for example with `/factory run <id>` or a
+     retry (see **Retry** below). Other jobs carry on as normal.
 5. Whenever a job reaches `WAIT` or `DONE`, run `factory/bin/job sync` again
    so a freed slot starts the next backlog item, and `next` any new job. If
    that `sync` prints `ERROR`, handle it as in step 1: stop and tell the user.
-6. Stop when no agent of yours is running, every open job is `WAIT` or
-   `ERROR`, and `sync` started nothing new. Report a short table: each job,
+6. Stop when no agent of yours is running, every open job is `WAIT`,
+   `ERROR` or stopped by an agent's `ERROR` reply (step 4), and `sync`
+   started nothing new. Report a short table: each job,
    its stage, and what it waits on (for `needs-human`, the note and the PR
    link from `factory/bin/job show <id> pr`). Mention that the user can reply
    with `/factory <feedback>`, `/factory approve <id>`,
@@ -106,8 +114,9 @@ ignores `concurrency` for this job.
 2. Loop [Run](#run) steps 2–4 for the printed id **only**. Never run
    `factory/bin/job sync`, and never run `next` for any other job, not even
    after this one finishes.
-3. Stop when that job's `next` prints `WAIT`, `DONE` or `ERROR` and none of
-   its agents is running. Report its stage and what it waits on (for
+3. Stop when that job's `next` prints `WAIT`, `DONE` or `ERROR`, or one of
+   its agents replied with an `ERROR` line (Run step 4), and none of its
+   agents is running. Report its stage and what it waits on (for
    `needs-human`, the note and the PR link from `factory/bin/job show <id> pr`),
    and the same reply commands as Run step 6.
 
@@ -145,7 +154,8 @@ with AskUserQuestion which one. Then decide what they want:
 - **Reject** ("drop", "reject", "won't do"): pass their reason the same way
   to `factory/bin/job reject <id>`. The reason goes on the issue, the PR
   closes, the job is done.
-- **Retry** ("retry", "try again", typically after a `did not write` ERROR):
+- **Retry** ("retry", "try again", typically after a `did not write` ERROR
+  from `next`, or an agent that replied `ERROR <agent> could not write ...`):
   `factory/bin/job retry <id>`, then `factory/bin/job next <id>`, and act on
   its line as in Run step 3.
 

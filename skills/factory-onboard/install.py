@@ -123,21 +123,31 @@ def describe_when(when):
     return " or ".join(parts)
 
 
-def default_model(model):
-    if isinstance(model, dict):
-        for r in RISKS:
-            if r in model:
-                return model[r]
-        return next(iter(model.values()))
-    return model
+MODEL_LINE_RE = re.compile(r"^model:.*$", re.M)
+
+
+def stamp_model(text, alias):
+    """Rewrite the `model:` line inside the leading frontmatter only."""
+    if not alias or not text.startswith("---\n"):
+        return text
+    end = text.find("\n---\n", 4)
+    if end < 0:
+        return text
+    head, rest = text[:end], text[end:]
+    return MODEL_LINE_RE.sub(lambda m: "model: %s" % alias, head, count=1) + rest
 
 
 def stamp_reviewer(tmpl, r):
-    out = tmpl
+    model = r.get("model", "sonnet")
+    if isinstance(model, dict):
+        # Routed per risk: the orchestrator always passes the model on spawn,
+        # so a fixed frontmatter model could only disagree with it.
+        out = tmpl.replace("model: {{MODEL}}\n", "")
+    else:
+        out = tmpl.replace("{{MODEL}}", model)
     for k, v in {
         "{{NAME}}": r["name"],
         "{{PURPOSE}}": r.get("purpose", "").strip().rstrip(".") + ".",
-        "{{MODEL}}": default_model(r.get("model", "sonnet")),
         "{{WHEN}}": describe_when(r.get("when", "always")),
         "{{FOCUS}}": (r.get("focus") or "- Anything within your purpose that must change before merging.").strip(),
     }.items():
@@ -251,16 +261,20 @@ def main():
     validate(a)
     inst = Installer(project, templates, o.force, o.dry_run)
 
+    config = build_config((templates / "factory/config.json").read_text(), a)
+    agent_models = json.loads(config).get("models", {}).get("agents", {})
+
     inst.copy(".claude/skills/factory/SKILL.md")
     for name in FIXED_AGENTS:
-        inst.copy(".claude/agents/%s.md" % name)
+        rel = ".claude/agents/%s.md" % name
+        inst.write(rel, stamp_model((templates / rel).read_text(), agent_models.get(name)))
     tmpl = (templates / ".claude/agents/reviewer.md").read_text()
     for r in a["reviewers"]:
         inst.write(".claude/agents/%s.md" % r["name"], stamp_reviewer(tmpl, r))
     for f in sorted((templates / "factory" / "bin").iterdir()):
         if f.is_file() and not f.name.startswith(".") and f.suffix != ".pyc":
             inst.copy("factory/bin/" + f.name, executable=True)
-    inst.write("factory/config.json", build_config((templates / "factory/config.json").read_text(), a))
+    inst.write("factory/config.json", config)
     inst.write("factory/checks.sh", checks_script((templates / "factory/checks.sh").read_text(), a["checks"]), 0o755)
     if a["backlog"] == "local":
         inst.copy("factory/backlog/EXAMPLE.md")

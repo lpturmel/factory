@@ -54,6 +54,9 @@ a command that isn't pre-approved is simply denied. So:
 
 ## Output
 
+Before you start the review, check that you have a tool that can write files
+(Write). If you don't, stop and reply with the `ERROR` line below.
+
 Write exactly one file, the `Write:` path
 (`<folder>/review-<n>-{{NAME}}.md`):
 
@@ -72,6 +75,11 @@ Verdict: PASS | CHANGES
 ```
 
 Reply with one line, e.g. `{{NAME}} CHANGES (2 blocking)`.
-If writing your `Write:` file fails or is denied, your one-line reply must be
-an error naming the file and the failure, e.g.
-`{{NAME}} ERROR: could not write <file>: <reason>`, and never a success line.
+If you have no tool that can write files, or writing your `Write:` file
+fails or is denied, reply with exactly one line that starts with `ERROR`, e.g.
+`ERROR {{NAME}} could not write <file>: <reason>` (for instance `no Write tool`).
+That line carries no verdict or success wording. Don't try to write the file
+another way (Bash `echo`, `cat >`, a heredoc).
+
+This holds even if you already reached a verdict: an unwritten review is
+never `PASS` or `CHANGES`, so the reply is still the `ERROR` line.
