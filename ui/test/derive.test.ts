@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import type { ApiFactory, JobJson } from "../src/shared/contract.ts";
+import type { ApiFactory, ApiJobDetail, JobJson } from "../src/shared/contract.ts";
 import {
-  DAY, MIN, attentionFile, attentionItems, attentionKind, gateFailStreak, phaseOf, reviewMatrix, runState, throughput7d,
+  DAY, MIN, attentionFile, attentionItems, attentionKind, gateFailStreak, phaseOf, reviewMatrix, runState, sameDetail, spanMs,
+  stageSpans, throughput7d,
 } from "../src/shared/derive.ts";
 import { compareFiles, parseStageFile } from "../src/shared/parse.ts";
 
@@ -96,6 +97,63 @@ describe("reviewMatrix", () => {
   it("marks gate-failed rounds as not run and live reviews as running", () => {
     const j = job({ stage: "review", round: 2, reviewers: [{ name: "a", model: "x" }, { name: "b", model: "y" }], verdicts: { gate: { 1: "FAIL", 2: "PASS" }, review: { 2: { a: "PASS" } } } });
     expect(reviewMatrix(j).rounds).toEqual([["skip", "skip"], ["PASS", "running"]]);
+  });
+});
+
+describe("stageSpans", () => {
+  const history: JobJson["history"] = [
+    { stage: "intake", at: iso(DAY), round: 0, note: "" },
+    { stage: "build", at: iso(50 * MIN), round: 1, note: "" },
+    { stage: "gate", at: iso(40 * MIN), round: 1, note: "" },
+    { stage: "build", at: iso(30 * MIN), round: 2, note: "" },
+    { stage: "gate", at: iso(10 * MIN), round: 2, note: "" },
+  ];
+  it("keys and finished spans don't depend on now; only the current span's ms does", () => {
+    const j = job({ history });
+    const a = stageSpans(j, NOW);
+    const b = stageSpans(j, NOW + 5 * MIN);
+    expect(b.map((s) => s.key)).toEqual(a.map((s) => s.key));
+    expect(b.slice(0, -1).map((s) => s.ms)).toEqual(a.slice(0, -1).map((s) => s.ms));
+    expect(b.at(-1)!.ms).not.toBe(a.at(-1)!.ms);
+    expect(b.at(-1)!.ms - a.at(-1)!.ms).toBe(5 * MIN);
+  });
+  it("keys are unique when a stage repeats across rounds", () => {
+    const keys = stageSpans(job({ history }), NOW).map((s) => s.key);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
+describe("spanMs", () => {
+  it("grows the current span with now and keeps finished spans fixed", () => {
+    const [done, cur] = stageSpans(job({ history: [{ stage: "build", at: iso(20 * MIN), round: 1, note: "" }, { stage: "gate", at: iso(5 * MIN), round: 1, note: "" }] }), 0);
+    expect(spanMs(done, NOW)).toBe(15 * MIN);
+    expect(spanMs(done, NOW + MIN)).toBe(15 * MIN);
+    expect(spanMs(cur, NOW)).toBe(5 * MIN);
+    expect(spanMs(cur, NOW + MIN)).toBe(6 * MIN);
+  });
+});
+
+describe("sameDetail", () => {
+  const detail = (): ApiJobDetail => ({
+    factory: "f", path: "/p/factory/jobs/gh-1",
+    job: job({ verdicts: { gate: { 1: "PASS" } } }),
+    files: [{ name: "gate-1.log", summary: [], verdicts: {}, mtime: iso(MIN), size: 120 }],
+  });
+  it("true for a deep clone and a re-parsed JSON copy", () => {
+    const d = detail();
+    expect(sameDetail(d, structuredClone(d))).toBe(true);
+    expect(sameDetail(d, JSON.parse(JSON.stringify(d)))).toBe(true);
+  });
+  it("false when history, a verdict, or a file's mtime/size changes", () => {
+    const d = detail();
+    const appended = detail(); appended.job.history.push({ stage: "build", at: iso(0), round: 1, note: "" });
+    const verdict = detail(); verdict.job.verdicts.gate = { 1: "FAIL" };
+    const mtime = detail(); mtime.files[0].mtime = iso(0);
+    const size = detail(); size.files[0].size = 121;
+    for (const other of [appended, verdict, mtime, size]) expect(sameDetail(d, other)).toBe(false);
+  });
+  it("false when there is no current detail", () => {
+    expect(sameDetail(null, detail())).toBe(false);
   });
 });
 

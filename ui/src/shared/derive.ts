@@ -1,5 +1,5 @@
 // Pure derivations from the state contract (DESIGN.md §8.7). No DOM, no Node.
-import { ACTIVE_STAGES, type ApiFactory, type ApiJob, type JobJson, type Stage } from "./contract.ts";
+import { ACTIVE_STAGES, type ApiFactory, type ApiJob, type ApiJobDetail, type JobJson, type Stage } from "./contract.ts";
 
 export const MIN = 60_000;
 export const HOUR = 60 * MIN;
@@ -190,15 +190,24 @@ export const PHASES: { key: Exclude<Phase, "done">; name: string; sub: string }[
 
 // ---------- job detail ----------
 
-export interface StageSpan { stage: Stage; round: number; at: number; ms: number; note: string; current: boolean }
+/** `key` identifies the history entry (index + stage), so it is stable whatever `now` is. */
+export interface StageSpan { key: string; stage: Stage; round: number; at: number; ms: number; note: string; current: boolean }
 
 export function stageSpans(job: JobJson, now: number): StageSpan[] {
   const h = job.history ?? [];
   return h.map((e, i) => {
     const at = ts(e.at);
     const end = i + 1 < h.length ? ts(h[i + 1].at) : now;
-    return { stage: e.stage, round: e.round, at, ms: Math.max(0, end - at), note: e.note, current: i === h.length - 1 };
+    return { key: `${i}:${e.stage}`, stage: e.stage, round: e.round, at, ms: Math.max(0, end - at), note: e.note, current: i === h.length - 1 };
   });
+}
+
+/** A span's duration at `now`: fixed for finished spans, still growing for the current one. */
+export const spanMs = (sp: StageSpan, now: number): number => (sp.current ? Math.max(0, now - sp.at) : sp.ms);
+
+/** Structural equality of two job details (both come from JSON, so a string compare is exact). */
+export function sameDetail(a: ApiJobDetail | null, b: ApiJobDetail): boolean {
+  return a !== null && (a === b || JSON.stringify(a) === JSON.stringify(b));
 }
 
 export type Cell = "PASS" | "CHANGES" | "skip" | "running" | "pending";
