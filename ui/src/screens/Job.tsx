@@ -7,7 +7,7 @@ import type { ApiJobDetail, ApiJobFile, JobJson, Stage } from "../shared/contrac
 import { FLOW_STAGES } from "../shared/contract.ts";
 import {
   type Cell, type StageSpan, YOUR_MOVE, attentionFile, attentionKind, attentionReason, duration, reviewMatrix, roundSummaries,
-  shortReviewer, stageSpans, ts, usd,
+  sameDetail, shortReviewer, spanMs, stageSpans, ts, usd,
 } from "../shared/derive.ts";
 import { Badge, CopyButton, KindBadge, ReviewerChip, RiskMeter, StageTag } from "../components/ui.tsx";
 import { FileDialog } from "../components/FileDialog.tsx";
@@ -30,7 +30,8 @@ export default function Job(props: RouteSectionProps) {
     const load = () => {
       const mine = ++seq;
       api.job(name, id).then(
-        (d) => { if (mine === seq) { setDetail(d); setError(null); } },
+        // An identical refetch changes nothing: keep the current object so nothing downstream re-runs.
+        (d) => { if (mine === seq) { if (!sameDetail(detail(), d)) setDetail(d); setError(null); } },
         (e: ApiError) => { if (mine === seq) setError(e); },
       );
     };
@@ -53,7 +54,9 @@ function JobView(props: { detail: ApiJobDetail; onOpen: (name: string) => void }
   const j = () => props.detail.job;
   const files = createMemo(() => new Map(props.detail.files.map((f) => [f.name, f])));
   const kind = createMemo(() => attentionKind(j()));
-  const spans = createMemo(() => stageSpans(j(), live.now()));
+  // Structure comes from the job alone, never the clock: the current span's ms is 0 here and
+  // only the text bindings (spanMs) read live.now(), so a tick touches text nodes and nothing else.
+  const spans = createMemo(() => stageSpans(j(), 0));
   const question = createMemo(() => {
     const k = kind();
     if (!k) return [];
@@ -73,7 +76,8 @@ function JobView(props: { detail: ApiJobDetail; onOpen: (name: string) => void }
     return out.filter((g) => g.spans.length).sort((a, b) => a.round - b.round);
   });
   const outcome = createMemo(() => { const last = spans().at(-1); return last && TERMINAL.includes(last.stage) ? last : null; });
-  const rounds = createMemo(() => new Map(roundSummaries(j(), live.now()).map((r) => [r.round, r])));
+  // Only gate/pass/changes are read from these; the round total below is ticked from the spans.
+  const rounds = createMemo(() => new Map(roundSummaries(j(), 0).map((r) => [r.round, r])));
   const latestRound = () => groups().at(-1)?.round ?? 0;
   // Rounds the user opened or closed by hand; the rest follow "newest open".
   const [toggled, setToggled] = createSignal<Record<number, boolean>>({});
@@ -94,7 +98,7 @@ function JobView(props: { detail: ApiJobDetail; onOpen: (name: string) => void }
           <h1 style={{ "margin-top": "8px" }}>{j().title}</h1>
           <div class="sub">
             <Show when={j().round}><span>Round <b class="hi">{j().round} of {j().max_rounds}</b></span></Show>
-            <span>⏱ <b class="hi">{duration(live.now() - ts(j().created_at))}</b> · {duration(live.now() - ts(j().stage_entered_at))} in {j().stage}</span>
+            <span>⏱ <b class="hi tick">{duration(live.now() - ts(j().created_at))}</b> · <span class="tick">{duration(live.now() - ts(j().stage_entered_at))}</span> in {j().stage}</span>
             <span>Cost <b class="hi">{usd(j().cost?.usd)}</b></span>
             <span class="mono faint">factory/jobs/{j().id}/</span>
           </div>
@@ -147,10 +151,10 @@ function JobView(props: { detail: ApiJobDetail; onOpen: (name: string) => void }
                   <b>{g().round === 0 ? "Setup" : `Round ${g().round}`}</b>
                   <RoundBadges job={j()} round={g().round} summary={rounds().get(g().round)} files={files()} />
                   <span class="spacer" />
-                  <span class="faint num">{duration(g().spans.reduce((a, s) => a + s.ms, 0))}</span>
+                  <span class="faint num tick end">{duration(g().spans.reduce((a, s) => a + spanMs(s, live.now()), 0))}</span>
                 </summary>
                 <div class="body">
-                  <For each={g().spans}>{(sp) => <Step job={j()} span={sp} files={files()} factory={props.detail.factory} onOpen={props.onOpen} />}</For>
+                  <For each={g().spans} keyed={(sp) => sp.key}>{(sp) => <Step job={j()} span={sp()} files={files()} factory={props.detail.factory} onOpen={props.onOpen} />}</For>
                 </div>
               </details>
             )}
@@ -161,8 +165,8 @@ function JobView(props: { detail: ApiJobDetail; onOpen: (name: string) => void }
                 <span class={`ic ${outcome()!.stage === "merged" ? "ok" : outcome()!.stage === "rejected" ? "warn" : "attn"}`} aria-hidden="true">{outcome()!.stage === "merged" ? "✓" : outcome()!.stage === "rejected" ? "✕" : "▲"}</span>
                 <div>
                   <div class="hd"><span class="name">{outcome()!.stage}</span><Show when={outcome()!.note}><span class="muted">{outcome()!.note}</span></Show><span class="when">{new Date(outcome()!.at).toLocaleString()}</span></div>
-                  <For each={["approve-" + j().round + ".md", "merge.md", "reject.md"].map((n) => files().get(n)).filter((f): f is ApiJobFile => !!f)}>
-                    {(f) => <FileCard file={f} onOpen={props.onOpen} />}
+                  <For each={["approve-" + j().round + ".md", "merge.md", "reject.md"].map((n) => files().get(n)).filter((f): f is ApiJobFile => !!f)} keyed={(f) => f.name}>
+                    {(f) => <FileCard file={f()} onOpen={props.onOpen} />}
                   </For>
                 </div>
               </div>
@@ -178,7 +182,7 @@ function JobView(props: { detail: ApiJobDetail; onOpen: (name: string) => void }
           <div class="panel">
             <div class="sec-title"><h3>Routing</h3></div>
             <Show when={j().reviewers.length} fallback={<p class="faint" style={{ margin: 0 }}>Not routed yet: intake decides risk and surfaces.</p>}>
-              <div style={{ display: "flex", "flex-wrap": "wrap", gap: "6px" }}><For each={j().reviewers}>{(r) => <ReviewerChip name={r.name} model={r.model} />}</For></div>
+              <div style={{ display: "flex", "flex-wrap": "wrap", gap: "6px" }}><For each={j().reviewers} keyed={(r) => r.name}>{(r) => <ReviewerChip name={r().name} model={r().model} />}</For></div>
               <div class="foot-note">From risk {j().risk ?? "—"}{j().surfaces.length ? ` + surfaces ${j().surfaces.join(", ")}` : ""} via config.json. Builder runs on {j().models?.builder ?? "opus"}.</div>
             </Show>
           </div>
@@ -239,6 +243,7 @@ function filesForSpan(job: JobJson, sp: StageSpan, files: Map<string, ApiJobFile
 const reviewerOf = (file: string, round: number) => file.slice(`review-${round}-`.length, -".md".length);
 
 function Step(props: { job: JobJson; span: StageSpan; files: Map<string, ApiJobFile>; factory: string; onOpen: (n: string) => void }) {
+  const live = useLive();
   const r = () => props.span.round;
   const gate = () => (props.span.stage === "gate" ? props.job.verdicts?.gate?.[String(r())] : undefined);
   const reviews = () => (props.span.stage === "review" ? props.job.verdicts?.review?.[String(r())] ?? {} : {});
@@ -268,17 +273,17 @@ function Step(props: { job: JobJson; span: StageSpan; files: Map<string, ApiJobF
         <div class="hd">
           <span class="name">{props.span.stage}</span><span class="model">{agent()}</span>
           <Show when={gate()}><Badge tone={gate() === "PASS" ? "ok" : "attn"}>{gate()}</Badge></Show>
-          <For each={props.job.reviewers.filter(() => props.span.stage === "review")}>
-            {(rv) => <ReviewerChip name={rv.name} model={rv.model} state={reviews()[rv.name] ?? (running() ? "running" : null)} />}
+          <For each={props.job.reviewers.filter(() => props.span.stage === "review")} keyed={(rv) => rv.name}>
+            {(rv) => <ReviewerChip name={rv().name} model={rv().model} state={reviews()[rv().name] ?? (running() ? "running" : null)} />}
           </For>
           <Show when={running()}><Badge tone="run"><span class="ping run" aria-hidden="true" />running</Badge></Show>
-          <span class="when">{running() ? "for " : ""}{duration(props.span.ms)}</span>
+          <span class="when">{running() ? "for " : ""}<span class="tick end">{duration(spanMs(props.span, live.now()))}</span></span>
         </div>
         <For each={fs()} keyed={(f) => f.name}>
           {(f, i) => <FileCard file={f()} onOpen={props.onOpen} compact={props.span.stage === "review" && i() > 0 && reviews()[reviewerOf(f().name, r())] !== "CHANGES"} />}
         </For>
         <Show when={gate() === "FAIL" || (props.span.stage === "gate" && !gate() && props.files.has(`gate-${r()}.log`))}>
-          <LogTail factory={props.factory} jobId={props.job.id} round={r()} onOpen={props.onOpen} />
+          <LogTail factory={props.factory} jobId={props.job.id} round={r()} log={props.files.get(`gate-${r()}.log`)} onOpen={props.onOpen} />
         </Show>
         <Show when={running() && !fs().length}>
           <div class="file"><div style={{ padding: "12px 14px", display: "flex", "flex-direction": "column", gap: "8px" }}>
@@ -309,13 +314,21 @@ function FileCard(props: { file: ApiJobFile; onOpen: (n: string) => void; compac
   );
 }
 
-function LogTail(props: { factory: string; jobId: string; round: number; onOpen: (n: string) => void }) {
+function LogTail(props: { factory: string; jobId: string; round: number; log?: ApiJobFile; onOpen: (n: string) => void }) {
   const [lines, setLines] = createSignal<string[] | null>(null);
-  onSettled(() => {
-    const ctl = new AbortController();
-    api.logTail(props.factory, props.jobId, props.round, 14, ctl.signal).then((t) => setLines(t.lines), () => setLines([]));
-    return () => ctl.abort();
-  });
+  // Fetch on mount, then again only when the log's size or mtime changes. The previous lines stay
+  // on screen while a refetch is in flight; a newer change aborts the older fetch.
+  createEffect(
+    () => (props.log ? `${props.log.size}:${props.log.mtime}` : ""),
+    () => {
+      const ctl = new AbortController();
+      api.logTail(props.factory, props.jobId, props.round, 14, ctl.signal).then(
+        (t) => setLines(t.lines),
+        () => { if (!ctl.signal.aborted) setLines([]); },
+      );
+      return () => ctl.abort();
+    },
+  );
   const bad = (l: string) => /FAIL|error|✕|assertion failed|panicked|Expected|Received/i.test(l);
   return (
     <Show when={lines()?.length}>
@@ -375,20 +388,20 @@ function Matrix(props: { job: JobJson; files: Map<string, ApiJobFile>; onOpen: (
       <div class="table-scroll">
         <table class="matrix">
           <caption class="sr-only">Reviewer verdicts per round</caption>
-          <thead><tr><th class="label" scope="col">Reviewer</th><For each={m().rounds}>{(_, i) => <th class="label" scope="col">R{i() + 1}</th>}</For></tr></thead>
+          <thead><tr><th class="label" scope="col">Reviewer</th><For each={m().rounds} keyed={false}>{(_, i) => <th class="label" scope="col">R{i + 1}</th>}</For></tr></thead>
           <tbody>
             <For each={m().reviewers}>
               {(name, ri) => (
                 <tr>
                   <th scope="row" style={{ "font-weight": "600" }}>{shortReviewer(name)} <span class="model">{model(name)}</span></th>
-                  <For each={m().rounds}>
+                  <For each={m().rounds} keyed={false}>
                     {(round, i) => {
-                      const c = () => round[ri()];
-                      const file = () => `review-${i() + 1}-${name}.md`;
+                      const c = () => round()[ri()];
+                      const file = () => `review-${i + 1}-${name}.md`;
                       return (
                         <td>
                           <Show when={(c() === "PASS" || c() === "CHANGES") && props.files.has(file())} fallback={<span class={`v ${cls[c()]}`}>{label[c()]}</span>}>
-                            <button type="button" class="verdict-btn" onClick={() => props.onOpen(file())} aria-label={`${shortReviewer(name)} round ${i() + 1}: ${c()}. Open ${file()}`}>
+                            <button type="button" class="verdict-btn" onClick={() => props.onOpen(file())} aria-label={`${shortReviewer(name)} round ${i + 1}: ${c()}. Open ${file()}`}>
                               <span class={`v ${cls[c()]}`}>{label[c()]}</span>
                             </button>
                           </Show>

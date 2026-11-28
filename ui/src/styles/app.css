@@ -50,6 +50,9 @@ body:has(.fd.t-light) { background: #f3f5f9; }
 .fd .round > summary b { font-family: var(--display); font-size: 16px; }
 .fd .round .takeaway { font-size: 13px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 52ch; }
 .fd .round.outcome { animation: none; }
+/* Ticking durations: fixed-width digits and a floor width, so 9s → 10s doesn't shove neighbours. */
+.fd .tick { display: inline-block; min-width: 3ch; font-variant-numeric: tabular-nums; }
+.fd .tick.end { text-align: right; }
 .fd .file.compact ul { display: none; }
 .fd .file.compact .fh { border-bottom: 0; }
 .fd .file .fh { flex-wrap: wrap; }
